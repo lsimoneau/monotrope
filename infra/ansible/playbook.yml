@@ -1,0 +1,188 @@
+---
+- name: Provision monotrope.au server
+  hosts: all
+  become: true
+
+  vars:
+    site_dir: /var/www/monotrope
+    deploy_user: deploy
+    deploy_pubkey: "{{ lookup('file', lookup('env', 'HOME') + '/.ssh/id_ed25519.pub') }}"
+
+  tasks:
+
+    # ── System ──────────────────────────────────────────────────────────────
+
+    - name: Update apt cache and upgrade packages
+      apt:
+        update_cache: true
+        upgrade: dist
+        cache_valid_time: 3600
+
+    - name: Install common dependencies
+      apt:
+        name:
+          - debian-keyring
+          - debian-archive-keyring
+          - apt-transport-https
+          - curl
+          - ufw
+        state: present
+
+    # ── Caddy ───────────────────────────────────────────────────────────────
+
+    - name: Add Caddy GPG key
+      shell: |
+        curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+          | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+
+    - name: Add Caddy apt repository
+      shell: |
+        curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+          | tee /etc/apt/sources.list.d/caddy-stable.list
+      args:
+        creates: /etc/apt/sources.list.d/caddy-stable.list
+
+    - name: Install Caddy
+      apt:
+        name: caddy
+        state: present
+        update_cache: true
+
+    - name: Install Caddyfile
+      copy:
+        src: ../Caddyfile
+        dest: /etc/caddy/Caddyfile
+        owner: root
+        group: caddy
+        mode: '0640'
+      notify: Restart Caddy
+
+    - name: Enable and start Caddy
+      systemd:
+        name: caddy
+        enabled: true
+        state: started
+
+    # ── Site directory ───────────────────────────────────────────────────────
+
+    - name: Create www system user
+      user:
+        name: www
+        system: true
+        create_home: false
+        shell: /usr/sbin/nologin
+        state: present
+
+    # ── UFW ─────────────────────────────────────────────────────────────────
+
+    - name: Set UFW default incoming policy to deny
+      ufw:
+        default: deny
+        direction: incoming
+
+    - name: Set UFW default outgoing policy to allow
+      ufw:
+        default: allow
+        direction: outgoing
+
+    - name: Allow SSH
+      ufw:
+        rule: allow
+        name: OpenSSH
+
+    - name: Allow HTTP
+      ufw:
+        rule: allow
+        port: '80'
+        proto: tcp
+
+    - name: Allow HTTPS
+      ufw:
+        rule: allow
+        port: '443'
+        proto: tcp
+
+    - name: Enable UFW
+      ufw:
+        state: enabled
+
+    # ── Docker ──────────────────────────────────────────────────────────────
+
+    - name: Create Docker keyring directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Add Docker GPG key
+      shell: |
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+          | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        chmod a+r /etc/apt/keyrings/docker.gpg
+      args:
+        creates: /etc/apt/keyrings/docker.gpg
+
+    - name: Add Docker apt repository
+      shell: |
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+          https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+          | tee /etc/apt/sources.list.d/docker.list
+      args:
+        creates: /etc/apt/sources.list.d/docker.list
+
+    - name: Install Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+
+    - name: Enable Docker
+      systemd:
+        name: docker
+        enabled: true
+        state: started
+
+    # ── Deploy user ──────────────────────────────────────────────────────────
+
+    - name: Create deploy user
+      user:
+        name: "{{ deploy_user }}"
+        create_home: true
+        shell: /bin/bash
+        state: present
+
+    - name: Set up deploy user SSH directory
+      file:
+        path: "/home/{{ deploy_user }}/.ssh"
+        state: directory
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: '0700'
+
+    - name: Install deploy user SSH public key
+      ansible.posix.authorized_key:
+        user: "{{ deploy_user }}"
+        key: "{{ deploy_pubkey }}"
+        state: present
+
+    - name: Create site directory
+      file:
+        path: "{{ site_dir }}"
+        state: directory
+        owner: "{{ deploy_user }}"
+        group: www
+        mode: '0775'
+
+  handlers:
+
+    - name: Restart Caddy
+      systemd:
+        name: caddy
+        state: restarted

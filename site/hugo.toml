@@ -1,0 +1,13 @@
+baseURL = "https://monotrope.au"
+languageCode = "en-au"
+title = "Monotrope"
+
+[markup.goldmark.renderer]
+  unsafe = false
+
+[outputs]
+  home = ["HTML", "RSS"]
+  section = ["HTML", "RSS"]
+
+[params]
+  description = "A personal blog."

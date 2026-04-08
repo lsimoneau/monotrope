@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ if not .IsHome }}{{ .Title }} · {{ end }}{{ .Site.Title }}</title>
+  <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}">
+  <link rel="stylesheet" href="/css/main.css">
+  {{ range .AlternativeOutputFormats -}}
+  {{ printf `
+  <link rel="%s" type="%s" href="%s" title="%s">` .Rel .MediaType.Type .Permalink $.Site.Title | safeHTML }}
+  {{ end -}}
+</head>
+
+<body>
+  <div class="site-wrap">
+    <header class="site-header">
+      <a class="site-title" href="/">{{ .Site.Title }}</a>
+      <nav class="site-nav">
+        <a href="/posts/">Writing</a>
+      </nav>
+    </header>
+
+    <main>
+      {{ block "main" . }}{{ end }}
+    </main>
+
+    <footer class="site-footer">
+      <p>&copy; {{ now.Year }} Monotrope. Built with <a href="https://gohugo.io">Hugo</a>.</p>
+    </footer>
+  </div>
+</body>
+
+</html>
