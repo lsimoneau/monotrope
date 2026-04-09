@@ -2,6 +2,14 @@ monotrope.au {
 	root * /var/www/monotrope
 	file_server
 
+	# Security headers
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+
 	# Compression
 	encode zstd gzip
 
@@ -27,6 +35,13 @@ www.monotrope.au {
 reader.monotrope.au {
 	reverse_proxy localhost:8080
 
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+
 	encode zstd gzip
 }
 
@@ -34,12 +49,25 @@ reader.monotrope.au {
 git.monotrope.au {
 	reverse_proxy localhost:3000
 
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+
 	encode zstd gzip
 }
 
 # GoatCounter analytics
 stats.monotrope.au {
 	reverse_proxy localhost:8081
+
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
 
 	encode zstd gzip
 }
