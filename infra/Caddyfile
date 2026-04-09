@@ -30,6 +30,13 @@ reader.monotrope.au {
 	encode zstd gzip
 }
 
+# Gitea
+git.monotrope.au {
+	reverse_proxy localhost:3000
+
+	encode zstd gzip
+}
+
 # GoatCounter analytics
 stats.monotrope.au {
 	reverse_proxy localhost:8081

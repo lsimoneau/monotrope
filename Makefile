@@ -1,4 +1,4 @@
-.PHONY: build serve deploy ssh setup miniflux goatcounter
+.PHONY: build serve deploy ssh setup miniflux gitea goatcounter enrich
 
 # Load .env if it exists
 -include .env
@@ -7,7 +7,7 @@ export
 DEPLOY_USER := deploy
 MONOTROPE_HOST ?=
 
-build:
+build: enrich
 	cd site && hugo --minify
 
 serve:
@@ -29,6 +29,13 @@ miniflux:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
 	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags miniflux
 
+gitea:
+	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
+	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags gitea
+
 goatcounter:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
 	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags goatcounter
+
+enrich:
+	uv run enrich.py

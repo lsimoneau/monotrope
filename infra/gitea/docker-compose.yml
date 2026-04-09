@@ -1,0 +1,45 @@
+services:
+  gitea:
+    image: gitea/gitea:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000"
+      - "2222:22"
+    volumes:
+      - gitea_data:/data
+    environment:
+      GITEA__database__DB_TYPE: postgres
+      GITEA__database__HOST: db:5432
+      GITEA__database__NAME: gitea
+      GITEA__database__USER: gitea
+      GITEA__database__PASSWD: "${GITEA_DB_PASSWORD}"
+      GITEA__server__ROOT_URL: "https://git.monotrope.au/"
+      GITEA__server__DOMAIN: "git.monotrope.au"
+      GITEA__server__SSH_DOMAIN: "git.monotrope.au"
+      GITEA__server__SSH_PORT: 2222
+    env_file:
+      - .env
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    volumes:
+      - gitea_db:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: gitea
+      POSTGRES_USER: gitea
+      POSTGRES_PASSWORD: "${GITEA_DB_PASSWORD}"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "gitea"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  gitea_data:
+  gitea_db:
