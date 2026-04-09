@@ -17,7 +17,12 @@
       <span class="rating-blocks">{{- strings.Repeat $rating "▓" -}}{{- strings.Repeat (sub 5 $rating) "░" -}}</span>
       <span class="rating-num">{{ $rating }}/5</span>
     </span>
+
   </div>
+
+  {{ with .Params.cover }}
+  <img class="book-cover" src="{{ . }}" alt="Cover of {{ $.Title }}">
+  {{ end }}
 
   {{ .Content }}
 

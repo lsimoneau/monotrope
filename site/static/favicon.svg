@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+<rect width="32" height="32" fill="#0b0d0a"/>
+<!-- Pixel art M — each "pixel" is a 2x2 block on the 32x32 grid -->
+<!-- Left vertical stroke -->
+<rect x="6"  y="8"  width="4" height="18" fill="#5bff8f"/>
+<!-- Right vertical stroke -->
+<rect x="22" y="8"  width="4" height="18" fill="#5bff8f"/>
+<!-- Left diagonal -->
+<rect x="10" y="10" width="2" height="4" fill="#5bff8f"/>
+<rect x="12" y="14" width="2" height="4" fill="#5bff8f"/>
+<!-- Right diagonal -->
+<rect x="20" y="10" width="2" height="4" fill="#5bff8f"/>
+<rect x="18" y="14" width="2" height="4" fill="#5bff8f"/>
+<!-- Center peak -->
+<rect x="14" y="16" width="4" height="4" fill="#5bff8f"/>
+</svg>

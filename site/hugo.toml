@@ -2,6 +2,9 @@ baseURL = "https://monotrope.au"
 languageCode = "en-au"
 title = "Monotrope"
 
+[markup.goldmark.extensions.typographer]
+  disable = false
+
 [markup.goldmark.renderer]
   unsafe = false
 
@@ -10,4 +13,4 @@ title = "Monotrope"
   section = ["HTML", "RSS"]
 
 [params]
-  description = "writing on software, books, and ideas."
+  description = "writing on technology, books, and ideas."
