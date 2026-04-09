@@ -22,3 +22,17 @@ monotrope.au {
 www.monotrope.au {
 	redir https://monotrope.au{uri} permanent
 }
+
+# Miniflux RSS reader
+reader.monotrope.au {
+	reverse_proxy localhost:8080
+
+	encode zstd gzip
+}
+
+# GoatCounter analytics
+stats.monotrope.au {
+	reverse_proxy localhost:8081
+
+	encode zstd gzip
+}

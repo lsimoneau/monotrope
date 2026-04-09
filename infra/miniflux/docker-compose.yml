@@ -1,0 +1,38 @@
+services:
+  miniflux:
+    image: miniflux/miniflux:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      DATABASE_URL: "postgres://miniflux:${MINIFLUX_DB_PASSWORD}@db/miniflux?sslmode=disable"
+      RUN_MIGRATIONS: "1"
+      CREATE_ADMIN: "1"
+      ADMIN_USERNAME: "${MINIFLUX_ADMIN_USER}"
+      ADMIN_PASSWORD: "${MINIFLUX_ADMIN_PASSWORD}"
+      BASE_URL: "https://reader.monotrope.au"
+    env_file:
+      - .env
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    volumes:
+      - miniflux_db:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: miniflux
+      POSTGRES_USER: miniflux
+      POSTGRES_PASSWORD: "${MINIFLUX_DB_PASSWORD}"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "miniflux"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  miniflux_db:

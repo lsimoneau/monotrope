@@ -6,97 +6,98 @@ Personal blog and server infrastructure for monotrope.au.
 
 ```
 monotrope/
-  site/           # Hugo site (content, templates, config)
-  infra/          # Server setup scripts and config files
-  deploy.sh       # Build + rsync to production
-  Makefile        # Common tasks
+  site/                    # Hugo site (content, templates, CSS)
+  infra/
+    ansible/playbook.yml   # Single playbook for all server provisioning
+    miniflux/              # Docker Compose for Miniflux RSS reader
+    Caddyfile              # Copied to /etc/caddy/Caddyfile by Ansible
+  deploy.sh                # Build + rsync to production
+  Makefile                 # Common tasks
+  .env                     # Local secrets (not committed)
 ```
 
 ## Tech Stack
 
-- **Static site generator:** Hugo
+- **Static site generator:** Hugo (no theme — templates built from scratch)
 - **Web server:** Caddy (automatic HTTPS via Let's Encrypt)
 - **Hosting:** DigitalOcean droplet (Sydney region, Ubuntu 24.04 LTS)
-- **Deployment:** `hugo build` then `rsync` to server
-- **Future services:** Docker Compose for anything beyond the blog
+- **Deployment:** `hugo --minify` then `rsync` to `/var/www/monotrope`
+- **Provisioning:** Ansible (`infra/ansible/playbook.yml`)
 
-## Setup Tasks
+## Services
 
-### 1. Initialise the repo
+| Service     | URL                         | How it runs     | Port |
+|-------------|-----------------------------|-----------------|------|
+| Blog        | https://monotrope.au        | Static files    | —    |
+| Miniflux    | https://reader.monotrope.au | Docker Compose  | 8080 |
+| GoatCounter | https://stats.monotrope.au  | systemd binary  | 8081 |
 
-- Create the directory structure above
-- `git init` with a sensible `.gitignore` (Hugo output dir `public/`, `.env`, etc.)
-- Initialise a new Hugo site inside `site/`
-- Use a minimal theme or no theme — we'll build templates from scratch later
-- Hugo config should set `baseURL = "https://monotrope.au"`
+## Ansible Playbook
 
-### 2. Create a minimal Hugo site
+**All server changes must go through Ansible.** Everything must be idempotent — no ad-hoc SSH changes.
 
-- A single layout (`layouts/_default/baseof.html`, `single.html`, `list.html`)
-- Minimal, clean CSS — no framework. Readable prose typography, dark mode support via `prefers-color-scheme`
-- A sample first post in `site/content/posts/` so we can test the build
-- RSS feed enabled (Hugo does this by default)
-- No JavaScript unless strictly necessary
+The playbook is at `infra/ansible/playbook.yml`. Tags let individual services be re-provisioned without touching the rest.
 
-### 3. Server provisioning script
+| Tag           | What it covers                                       |
+|---------------|------------------------------------------------------|
+| `miniflux`    | Miniflux Docker Compose + Caddyfile update           |
+| `goatcounter` | GoatCounter binary, systemd service + Caddyfile      |
+| (no tag)      | Full provisioning (system, Caddy, Docker, UFW, users)|
 
-Create `infra/setup.sh` — a bash script intended to be run once on a fresh Ubuntu 24.04 droplet via SSH. It should:
+### Secrets
 
-- Update packages
-- Install Caddy via the official apt repo
-- Create a `www` user with no login shell to own the site files
-- Create `/var/www/monotrope` owned by `www`
-- Install a Caddyfile at `/etc/caddy/Caddyfile` that:
-  - Serves `monotrope.au` from `/var/www/monotrope`
-  - Enables gzip/zstd compression
-  - Sets sensible cache headers for static assets
-  - Handles `www.monotrope.au` redirect to apex
-- Enable and start the Caddy service
-- Set up UFW: allow SSH, HTTP, HTTPS, deny everything else
-- Install Docker and Docker Compose (for future use, not needed yet)
-- Create a deploy user with SSH key auth and permission to write to `/var/www/monotrope`
+Pulled from environment variables, loaded from `.env` via Makefile:
 
-Also create `infra/Caddyfile` as a standalone config file that the setup script copies into place.
+```
+MONOTROPE_HOST
+MINIFLUX_DB_PASSWORD
+MINIFLUX_ADMIN_USER
+MINIFLUX_ADMIN_PASSWORD
+GOATCOUNTER_ADMIN_EMAIL
+GOATCOUNTER_ADMIN_PASSWORD
+```
 
-### 4. Deploy script
+### GoatCounter
 
-Create `deploy.sh` at the repo root:
+Runs as a systemd service (not Docker) using the pre-built binary from GitHub releases.
+Version is pinned via `goatcounter_version` var in the playbook.
+Initial site/user creation is gated on a `/var/lib/goatcounter/.admin_created` marker file
+so re-running the playbook never attempts to recreate the user.
 
-- Run `hugo --minify` in `site/`
-- `rsync -avz --delete site/public/ deploy@<DROPLET_IP>:/var/www/monotrope/`
-- Print the URL on success
+## Makefile Targets
 
-The droplet IP should come from an environment variable `MONOTROPE_HOST` or a `.env` file (not committed).
-
-### 5. Makefile
-
-Targets:
-- `make build` — build the site locally
-- `make serve` — `hugo server` for local dev with live reload
-- `make deploy` — run `deploy.sh`
-- `make ssh` — SSH into the droplet as the deploy user
-- `make setup` — run the provisioning script on a fresh droplet
-
-## Conventions
-
-- All shell scripts should use `set -euo pipefail`
-- Prefer clarity over cleverness in all scripts
-- No unnecessary dependencies — this should stay simple
-- Australian English in all content and comments
-- Markdown content lives in `site/content/`; one subdirectory per content type (e.g. `posts/`, `pages/`)
+```
+make build        # hugo --minify
+make serve        # hugo server --buildDrafts (local dev)
+make deploy       # build + rsync to production
+make ssh          # SSH as deploy user
+make setup        # Full Ansible provisioning (fresh droplet)
+make miniflux     # Ansible --tags miniflux
+make goatcounter  # Ansible --tags goatcounter
+```
 
 ## DNS
 
-The user will configure DNS separately via their registrar. The server expects:
 - `monotrope.au` → droplet IP (A record)
-- `www.monotrope.au` → droplet IP (A record)
+- `www.monotrope.au` → droplet IP (A record, redirects to apex via Caddy)
+- `reader.monotrope.au` → droplet IP (A record)
+- `stats.monotrope.au` → droplet IP (A record)
 
-Caddy will handle certificate provisioning automatically once DNS is pointed.
+## Site Layout
 
-## What This Is Not
+Content lives in `site/content/`:
+- `posts/` — writing
+- `reviews/` — book reviews
+- `about.md` — about page (uses `layouts/page/single.html`)
 
-- No CI/CD pipeline — deploy is manual via `make deploy`
-- No containerisation of the blog itself — it's static files
-- No database
-- No analytics (for now)
-- No comments system (for now)
+Templates are in `site/layouts/`. No JavaScript unless strictly necessary.
+The GoatCounter analytics script is injected in `baseof.html` and only loads
+in production builds (`hugo.IsProduction`).
+
+## Conventions
+
+- All shell scripts use `set -euo pipefail`
+- All server changes go through Ansible — no one-off SSH commands
+- Ansible tasks must be idempotent
+- Australian English in content and comments
+- No CI/CD — deploys are manual via `make deploy`

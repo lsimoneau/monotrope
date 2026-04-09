@@ -1,10 +1,56 @@
 {{ define "main" }}
-<ul class="post-list">
-  {{ range (where .Site.RegularPages "Type" "posts").ByDate.Reverse }}
-  <li>
-    <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006-01-02" }}</time>
-    <a href="{{ .Permalink }}">{{ .Title }}</a>
-  </li>
-  {{ end }}
-</ul>
+<div class="home-prompt">
+  <span class="prompt-line">whoami</span>
+  <span class="prompt-response">{{ .Site.Params.description | default "writing on technology, books, and ideas."
+    }}</span>
+  <span class="prompt-line"><span class="cursor"></span></span>
+</div>
+
+<div class="home-sections">
+
+  <section>
+    <div class="home-section-head">
+      <h2>writing</h2>
+      <a class="see-all" href="/posts/">all posts</a>
+    </div>
+    <ul class="post-list">
+      {{ range first 5 (where .Site.RegularPages "Section" "posts").ByDate.Reverse }}
+      <li>
+        <time datetime="{{ .Date.Format " 2006-01-02" }}">{{ .Date.Format "2006-01-02" }}</time>
+        <div class="post-entry">
+          <a href="{{ .RelPermalink }}">{{ .Title }}</a>
+          {{ with .Params.tags }}
+          <div class="tags">
+            {{ range . }}<a class="tag" href="/tags/{{ . | urlize }}/">{{ . }}</a>{{ end }}
+          </div>
+          {{ end }}
+        </div>
+      </li>
+      {{ end }}
+    </ul>
+  </section>
+
+  <section>
+    <div class="home-section-head">
+      <h2>reading</h2>
+      <a class="see-all" href="/reviews/">all reviews</a>
+    </div>
+    <ul class="review-list">
+      {{ range first 3 (where .Site.RegularPages "Section" "reviews").ByDate.Reverse }}
+      {{ $rating := .Params.rating | default 0 }}
+      <li>
+        <span class="review-date">{{ .Params.date_read | default (.Date.Format "2006-01") }}</span>
+        <div class="review-entry">
+          <a href="{{ .RelPermalink }}">{{ .Title }}</a>
+          {{ with .Params.book_author }}<span class="review-author">{{ . }}</span>{{ end }}
+          <span class="review-rating">
+            {{- strings.Repeat $rating "▓" -}}{{- strings.Repeat (sub 5 $rating) "░" -}}
+          </span>
+        </div>
+      </li>
+      {{ end }}
+    </ul>
+  </section>
+
+</div>
 {{ end }}

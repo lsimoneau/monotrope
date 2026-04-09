@@ -1,0 +1,24 @@
+{{ define "main" }}
+<p class="section-label">reading</p>
+<ul class="review-list">
+  {{ range .Pages.ByDate.Reverse }}
+  {{ $rating := .Params.rating | default 0 }}
+  <li>
+    <span class="review-date">{{ .Params.date_read | default (.Date.Format "2006-01") }}</span>
+    <div class="review-entry">
+      <a href="{{ .RelPermalink }}">{{ .Title }}</a>
+      {{ with .Params.book_author }}<span class="review-author">{{ . }}</span>{{ end }}
+      <span class="review-rating">
+        {{- strings.Repeat $rating "▓" -}}{{- strings.Repeat (sub 5 $rating) "░" -}}
+        <span style="color: var(--muted); font-size: 0.8em; margin-left: 0.4rem;">{{ $rating }}/5</span>
+      </span>
+      {{ with .Params.tags }}
+      <div class="tags">
+        {{ range . }}<a class="tag" href="/tags/{{ . | urlize }}/">{{ . }}</a>{{ end }}
+      </div>
+      {{ end }}
+    </div>
+  </li>
+  {{ end }}
+</ul>
+{{ end }}

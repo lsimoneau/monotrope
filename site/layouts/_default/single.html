@@ -1,9 +1,17 @@
 {{ define "main" }}
 <article>
   <h1>{{ .Title }}</h1>
-  <p class="post-meta">
+  <div class="post-meta">
     <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2 January 2006" }}</time>
-  </p>
+    {{ with .ReadingTime }}<span>{{ . }} min read</span>{{ end }}
+  </div>
   {{ .Content }}
+  {{ with .Params.tags }}
+  <div class="post-footer">
+    <div class="tags">
+      {{ range . }}<a class="tag" href="/tags/{{ . | urlize }}/">{{ . }}</a>{{ end }}
+    </div>
+  </div>
+  {{ end }}
 </article>
 {{ end }}

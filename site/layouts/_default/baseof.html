@@ -6,10 +6,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ if not .IsHome }}{{ .Title }} · {{ end }}{{ .Site.Title }}</title>
   <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/main.css">
   {{ range .AlternativeOutputFormats -}}
-  {{ printf `
-  <link rel="%s" type="%s" href="%s" title="%s">` .Rel .MediaType.Type .Permalink $.Site.Title | safeHTML }}
+  {{ printf `<link rel="%s" type="%s" href="%s" title="%s">` .Rel .MediaType.Type .Permalink $.Site.Title | safeHTML }}
+  {{ end -}}
+  {{ if hugo.IsProduction }}
+  <script data-goatcounter="https://stats.monotrope.au/count" async src="https://stats.monotrope.au/count.js"></script>
   {{ end -}}
 </head>
 
@@ -18,7 +23,9 @@
     <header class="site-header">
       <a class="site-title" href="/">{{ .Site.Title }}</a>
       <nav class="site-nav">
-        <a href="/posts/">Writing</a>
+        <a href="/about/"{{ if hasPrefix .RelPermalink "/about" }} class="active"{{ end }}>about</a>
+        <a href="/posts/"{{ if hasPrefix .RelPermalink "/posts" }} class="active"{{ end }}>writing</a>
+        <a href="/reviews/"{{ if hasPrefix .RelPermalink "/reviews" }} class="active"{{ end }}>reading</a>
       </nav>
     </header>
 
@@ -27,7 +34,8 @@
     </main>
 
     <footer class="site-footer">
-      <p>&copy; {{ now.Year }} Monotrope. Built with <a href="https://gohugo.io">Hugo</a>.</p>
+      <span>monotrope.au</span>
+      <span>&copy; {{ now.Year }}</span>
     </footer>
   </div>
 </body>

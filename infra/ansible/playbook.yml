@@ -7,6 +7,12 @@
     site_dir: /var/www/monotrope
     deploy_user: deploy
     deploy_pubkey: "{{ lookup('file', lookup('env', 'HOME') + '/.ssh/id_ed25519.pub') }}"
+    miniflux_db_password: "{{ lookup('env', 'MINIFLUX_DB_PASSWORD') }}"
+    miniflux_admin_user: "{{ lookup('env', 'MINIFLUX_ADMIN_USER') | default('admin') }}"
+    miniflux_admin_password: "{{ lookup('env', 'MINIFLUX_ADMIN_PASSWORD') }}"
+    goatcounter_version: "2.7.0"
+    goatcounter_admin_email: "{{ lookup('env', 'GOATCOUNTER_ADMIN_EMAIL') }}"
+    goatcounter_admin_password: "{{ lookup('env', 'GOATCOUNTER_ADMIN_PASSWORD') }}"
 
   tasks:
 
@@ -58,6 +64,9 @@
         group: caddy
         mode: '0640'
       notify: Restart Caddy
+      tags:
+        - miniflux
+        - goatcounter
 
     - name: Enable and start Caddy
       systemd:
@@ -149,6 +158,142 @@
         enabled: true
         state: started
 
+    # ── Miniflux ────────────────────────────────────────────────────────────
+
+    - name: Create Miniflux directory
+      file:
+        path: /opt/miniflux
+        state: directory
+        owner: root
+        group: root
+        mode: '0750'
+      tags: miniflux
+
+    - name: Copy Miniflux docker-compose.yml
+      copy:
+        src: ../miniflux/docker-compose.yml
+        dest: /opt/miniflux/docker-compose.yml
+        owner: root
+        group: root
+        mode: '0640'
+      tags: miniflux
+
+    - name: Write Miniflux .env
+      copy:
+        dest: /opt/miniflux/.env
+        owner: root
+        group: root
+        mode: '0600'
+        content: |
+          MINIFLUX_DB_PASSWORD={{ miniflux_db_password }}
+          MINIFLUX_ADMIN_USER={{ miniflux_admin_user }}
+          MINIFLUX_ADMIN_PASSWORD={{ miniflux_admin_password }}
+      no_log: true
+      tags: miniflux
+
+    - name: Pull and start Miniflux
+      command: docker compose up -d --pull always
+      args:
+        chdir: /opt/miniflux
+      tags: miniflux
+
+    # ── GoatCounter ─────────────────────────────────────────────────────────
+
+    - name: Create goatcounter system user
+      user:
+        name: goatcounter
+        system: true
+        create_home: false
+        shell: /usr/sbin/nologin
+        state: present
+      tags: goatcounter
+
+    - name: Create GoatCounter data directory
+      file:
+        path: /var/lib/goatcounter
+        state: directory
+        owner: goatcounter
+        group: goatcounter
+        mode: '0750'
+      tags: goatcounter
+
+    - name: Download GoatCounter binary
+      get_url:
+        url: "https://github.com/arp242/goatcounter/releases/download/v{{ goatcounter_version }}/goatcounter-v{{ goatcounter_version }}-linux-amd64.gz"
+        dest: /tmp/goatcounter.gz
+        mode: '0644'
+      tags: goatcounter
+
+    - name: Decompress GoatCounter binary
+      shell: gunzip -f /tmp/goatcounter.gz && mv /tmp/goatcounter /usr/local/bin/goatcounter && chmod 0755 /usr/local/bin/goatcounter
+      args:
+        creates: /usr/local/bin/goatcounter
+      tags: goatcounter
+
+    - name: Check if GoatCounter admin user has been created
+      stat:
+        path: /var/lib/goatcounter/.admin_created
+      register: goatcounter_admin_marker
+      tags: goatcounter
+
+    - name: Create GoatCounter admin user
+      command: >
+        goatcounter db create site
+        -db sqlite+/var/lib/goatcounter/goatcounter.sqlite3
+        -createdb
+        -vhost stats.monotrope.au
+        -user.email {{ goatcounter_admin_email }}
+        -user.password {{ goatcounter_admin_password }}
+      become_user: goatcounter
+      when: not goatcounter_admin_marker.stat.exists
+      no_log: true
+      tags: goatcounter
+
+    - name: Mark GoatCounter admin user as created
+      file:
+        path: /var/lib/goatcounter/.admin_created
+        state: touch
+        owner: goatcounter
+        group: goatcounter
+        mode: '0600'
+      when: not goatcounter_admin_marker.stat.exists
+      tags: goatcounter
+
+    - name: Install GoatCounter systemd service
+      copy:
+        dest: /etc/systemd/system/goatcounter.service
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=GoatCounter analytics
+          After=network.target
+
+          [Service]
+          User=goatcounter
+          Group=goatcounter
+          ExecStart=/usr/local/bin/goatcounter serve \
+            -listen localhost:8081 \
+            -db sqlite+/var/lib/goatcounter/goatcounter.sqlite3 \
+            -tls none \
+            -domain stats.monotrope.au
+          Restart=on-failure
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: Restart GoatCounter
+      tags: goatcounter
+
+    - name: Enable and start GoatCounter
+      systemd:
+        name: goatcounter
+        enabled: true
+        state: started
+        daemon_reload: true
+      tags: goatcounter
+
     # ── Deploy user ──────────────────────────────────────────────────────────
 
     - name: Create deploy user
@@ -185,4 +330,9 @@
     - name: Restart Caddy
       systemd:
         name: caddy
+        state: restarted
+
+    - name: Restart GoatCounter
+      systemd:
+        name: goatcounter
         state: restarted
