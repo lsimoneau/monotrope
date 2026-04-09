@@ -86,6 +86,48 @@
         shell: /usr/sbin/nologin
         state: present
 
+    # ── SSH hardening ───────────────────────────────────────────────────────
+
+    - name: Harden SSH configuration
+      copy:
+        dest: /etc/ssh/sshd_config.d/hardening.conf
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          PasswordAuthentication no
+          PermitRootLogin prohibit-password
+          MaxAuthTries 3
+      notify: Restart sshd
+
+    # ── Fail2ban ────────────────────────────────────────────────────────────
+
+    - name: Install fail2ban
+      apt:
+        name: fail2ban
+        state: present
+
+    - name: Configure fail2ban SSH jail
+      copy:
+        dest: /etc/fail2ban/jail.local
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [sshd]
+          enabled = true
+          port = ssh
+          maxretry = 3
+          bantime = 3600
+          findtime = 600
+      notify: Restart fail2ban
+
+    - name: Enable and start fail2ban
+      systemd:
+        name: fail2ban
+        enabled: true
+        state: started
+
     # ── UFW ─────────────────────────────────────────────────────────────────
 
     - name: Set UFW default incoming policy to deny
@@ -380,4 +422,14 @@
     - name: Restart GoatCounter
       systemd:
         name: goatcounter
+        state: restarted
+
+    - name: Restart sshd
+      systemd:
+        name: ssh
+        state: restarted
+
+    - name: Restart fail2ban
+      systemd:
+        name: fail2ban
         state: restarted
