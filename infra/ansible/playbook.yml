@@ -399,6 +399,7 @@
         chdir: /opt/hermes
       tags: hermes
 
+
     # ── GoatCounter ─────────────────────────────────────────────────────────
 
     - name: Create goatcounter system user

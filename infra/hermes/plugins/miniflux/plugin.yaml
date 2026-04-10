@@ -1,6 +1,10 @@
 name: miniflux
-version: 1.0.0
-description: Read feeds and entries from the local Miniflux RSS reader
+version: 2.0.0
+description: Read and manage feeds and entries from the local Miniflux RSS reader
 provides_tools:
   - list_feeds
   - get_unread_entries
+  - get_entry
+  - toggle_bookmark
+  - update_feed_filters
+  - mark_as_read
