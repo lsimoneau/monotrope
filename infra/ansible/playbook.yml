@@ -344,13 +344,17 @@
         mode: '0640'
       tags: hermes
 
-    - name: Copy Hermes config.yaml
+    - name: Stage Hermes config.yaml
       copy:
         src: ../hermes/config.yaml
         dest: /opt/hermes/config.yaml
         owner: root
         group: root
         mode: '0640'
+      tags: hermes
+
+    - name: Copy config.yaml into Hermes volume
+      command: docker cp /opt/hermes/config.yaml hermes:/opt/data/config.yaml
       notify: Restart Hermes
       tags: hermes
 

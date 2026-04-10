@@ -13,7 +13,6 @@ services:
       - monotrope
     volumes:
       - hermes_data:/opt/data
-      - ./config.yaml:/opt/data/config.yaml:ro
       - ./plugins:/opt/data/plugins:ro
     environment:
       OPENROUTER_API_KEY: "${OPENROUTER_API_KEY}"

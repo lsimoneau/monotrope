@@ -1,10 +1,9 @@
 model:
   provider: openrouter
   default: openrouter/auto
-
 memory:
   memory_enabled: true
   user_profile_enabled: true
-
 agent:
   max_turns: 70
+TELEGRAM_HOME_CHANNEL: '8455090116'
