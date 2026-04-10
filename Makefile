@@ -1,4 +1,4 @@
-.PHONY: build serve deploy ssh setup miniflux gitea goatcounter enrich
+.PHONY: build serve deploy ssh setup miniflux gitea goatcounter hermes hermes-chat enrich
 
 # Load .env if it exists
 -include .env
@@ -36,6 +36,15 @@ gitea:
 goatcounter:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
 	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags goatcounter
+
+hermes:
+	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
+	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags hermes
+
+hermes-chat:
+	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
+	ssh -t root@$(MONOTROPE_HOST) docker exec -it hermes hermes chat
+
 
 enrich:
 	uv run enrich.py

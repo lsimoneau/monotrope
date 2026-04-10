@@ -24,6 +24,8 @@ monotrope.au {
 		path *.html / /posts/ /posts/*
 	}
 	header @html Cache-Control "public, max-age=0, must-revalidate"
+
+
 }
 
 # Redirect www to apex

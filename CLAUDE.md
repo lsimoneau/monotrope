@@ -22,6 +22,17 @@ CSS. The design should feel minimal, typographic, and monospaced-first.
 
 DigitalOcean droplet, Sydney region, Ubuntu 24.04 LTS.
 
+### What's on the server
+
+- **Hugo static site** — built locally, rsynced to `/var/www/monotrope`
+- **Caddy** — reverse proxy and TLS for all services
+- **Miniflux** — RSS reader (Docker, PostgreSQL)
+- **Gitea** — self-hosted git server (Docker, PostgreSQL, SSH on port 2222)
+- **GoatCounter** — privacy-friendly analytics (native binary, SQLite)
+- **Hermes Agent** — Nous Research's LLM agent (`nousresearch/hermes-agent`),
+  exposed via Telegram bot. Routes through OpenRouter. Used as a personal
+  assistant reachable from mobile. Docker, config in `infra/hermes/`.
+
 ## Conventions
 
 - All shell scripts use `set -euo pipefail`

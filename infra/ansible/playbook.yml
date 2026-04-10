@@ -14,6 +14,9 @@
     goatcounter_version: "2.7.0"
     goatcounter_admin_email: "{{ lookup('env', 'GOATCOUNTER_ADMIN_EMAIL') }}"
     goatcounter_admin_password: "{{ lookup('env', 'GOATCOUNTER_ADMIN_PASSWORD') }}"
+    hermes_openrouter_api_key: "{{ lookup('env', 'HERMES_OPENROUTER_API_KEY') }}"
+    hermes_telegram_bot_token: "{{ lookup('env', 'HERMES_TELEGRAM_BOT_TOKEN') }}"
+    hermes_telegram_allowed_users: "{{ lookup('env', 'HERMES_TELEGRAM_ALLOWED_USERS') }}"
 
   tasks:
 
@@ -311,6 +314,55 @@
         chdir: /opt/gitea
       tags: gitea
 
+    # ── Hermes Agent ────────────────────────────────────────────────────────
+
+    - name: Create Hermes directory
+      file:
+        path: /opt/hermes
+        state: directory
+        owner: root
+        group: root
+        mode: '0750'
+      tags: hermes
+
+    - name: Copy Hermes docker-compose.yml
+      copy:
+        src: ../hermes/docker-compose.yml
+        dest: /opt/hermes/docker-compose.yml
+        owner: root
+        group: root
+        mode: '0640'
+      tags: hermes
+
+    - name: Copy Hermes config.yaml
+      copy:
+        src: ../hermes/config.yaml
+        dest: /opt/hermes/config.yaml
+        owner: root
+        group: root
+        mode: '0640'
+      notify: Restart Hermes
+      tags: hermes
+
+    - name: Write Hermes .env
+      copy:
+        dest: /opt/hermes/.env
+        owner: root
+        group: root
+        mode: '0600'
+        content: |
+          OPENROUTER_API_KEY={{ hermes_openrouter_api_key }}
+          TELEGRAM_BOT_TOKEN={{ hermes_telegram_bot_token }}
+          TELEGRAM_ALLOWED_USERS={{ hermes_telegram_allowed_users }}
+      no_log: true
+      tags: hermes
+
+    - name: Pull and start Hermes
+      command: docker compose up -d --pull always
+      args:
+        chdir: /opt/hermes
+      tags: hermes
+
     # ── GoatCounter ─────────────────────────────────────────────────────────
 
     - name: Create goatcounter system user
@@ -461,3 +513,8 @@
       systemd:
         name: fail2ban
         state: restarted
+
+    - name: Restart Hermes
+      command: docker compose restart
+      args:
+        chdir: /opt/hermes
