@@ -544,7 +544,7 @@
           docker compose exec -T kobodl kobodl --config /home/config/kobodl.json book get --get-all --output-dir /downloads
 
           # Import any new EPUBs into Calibre library
-          docker compose exec -T calibre-web sh -c '
+          docker compose exec -T --user abc calibre-web sh -c '
             for f in /downloads/*.epub; do
               [ -f "$f" ] || continue
               calibredb add "$f" --with-library /library/ && rm "$f"
