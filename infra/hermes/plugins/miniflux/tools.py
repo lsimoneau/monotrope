@@ -1,10 +1,14 @@
 import json
-import os
 import urllib.request
 import urllib.error
+from pathlib import Path
 
-MINIFLUX_BASE = os.environ.get("MINIFLUX_BASE_URL", "http://miniflux:8080")
-MINIFLUX_KEY = os.environ.get("MINIFLUX_API_KEY", "")
+_PLUGIN_DIR = Path(__file__).parent
+with open(_PLUGIN_DIR / "config.json") as _f:
+    _CONFIG = json.loads(_f.read())
+
+MINIFLUX_BASE = _CONFIG.get("base_url", "http://miniflux:8080")
+MINIFLUX_KEY = _CONFIG.get("api_key", "")
 
 
 def _request(path):

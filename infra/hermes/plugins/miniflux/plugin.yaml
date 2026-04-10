@@ -1,10 +1,6 @@
 name: miniflux
 version: 1.0.0
 description: Read feeds and entries from the local Miniflux RSS reader
-requires_env:
-  MINIFLUX_API_KEY:
-    description: Miniflux API key (generate in Miniflux → Settings → API Keys)
-    secret: true
 provides_tools:
   - list_feeds
   - get_unread_entries

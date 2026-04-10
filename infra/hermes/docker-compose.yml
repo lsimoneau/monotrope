@@ -19,8 +19,6 @@ services:
       OPENROUTER_API_KEY: "${OPENROUTER_API_KEY}"
       TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN}"
       TELEGRAM_ALLOWED_USERS: "${TELEGRAM_ALLOWED_USERS}"
-      MINIFLUX_API_KEY: "${MINIFLUX_API_KEY}"
-      MINIFLUX_BASE_URL: "http://miniflux:8080"
     env_file:
       - .env
 

@@ -365,6 +365,21 @@
       notify: Restart Hermes
       tags: hermes
 
+    - name: Write Miniflux plugin config
+      copy:
+        dest: /opt/hermes/plugins/miniflux/config.json
+        owner: root
+        group: root
+        mode: '0600'
+        content: |
+          {
+            "base_url": "http://miniflux:8080",
+            "api_key": "{{ hermes_miniflux_api_key }}"
+          }
+      no_log: true
+      notify: Restart Hermes
+      tags: hermes
+
     - name: Write Hermes .env
       copy:
         dest: /opt/hermes/.env
@@ -375,7 +390,6 @@
           OPENROUTER_API_KEY={{ hermes_openrouter_api_key }}
           TELEGRAM_BOT_TOKEN={{ hermes_telegram_bot_token }}
           TELEGRAM_ALLOWED_USERS={{ hermes_telegram_allowed_users }}
-          MINIFLUX_API_KEY={{ hermes_miniflux_api_key }}
       no_log: true
       tags: hermes
 
