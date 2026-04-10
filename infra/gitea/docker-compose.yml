@@ -12,7 +12,7 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:3000:3000"
-      - "2222:22"
+      - "10.100.0.1:2222:22"
     volumes:
       - gitea_data:/data
     environment:
