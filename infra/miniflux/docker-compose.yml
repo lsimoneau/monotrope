@@ -12,6 +12,9 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:8080:8080"
+    networks:
+      - default
+      - monotrope
     environment:
       DATABASE_URL: "postgres://miniflux:${MINIFLUX_DB_PASSWORD}@db/miniflux?sslmode=disable"
       RUN_MIGRATIONS: "1"
@@ -43,6 +46,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+networks:
+  default:
+  monotrope:
+    external: true
 
 volumes:
   miniflux_db:
