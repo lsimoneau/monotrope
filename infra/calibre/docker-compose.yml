@@ -1,0 +1,50 @@
+services:
+  kobodl:
+    image: ghcr.io/subdavis/kobodl
+    restart: unless-stopped
+    user: "1000:1000"
+    command: --config /home/config/kobodl.json serve --host 0.0.0.0 --output-dir /downloads
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    ports:
+      - "10.100.0.1:5100:5000"
+    volumes:
+      - kobodl_config:/home/config
+      - downloads:/downloads
+    networks:
+      - default
+      - monotrope
+
+  calibre-web:
+    image: lscr.io/linuxserver/calibre-web:latest
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    ports:
+      - "127.0.0.1:8083:8083"
+    volumes:
+      - calibre_config:/config
+      - library:/library
+      - downloads:/downloads
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: "Australia/Sydney"
+      DOCKER_MODS: "linuxserver/mods:universal-calibre"
+
+networks:
+  default:
+  monotrope:
+    external: true
+
+volumes:
+  kobodl_config:
+  calibre_config:
+  library:
+  downloads:

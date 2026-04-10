@@ -18,6 +18,7 @@
     hermes_telegram_bot_token: "{{ lookup('env', 'HERMES_TELEGRAM_BOT_TOKEN') }}"
     hermes_telegram_allowed_users: "{{ lookup('env', 'HERMES_TELEGRAM_ALLOWED_USERS') }}"
     hermes_miniflux_api_key: "{{ lookup('env', 'HERMES_MINIFLUX_API_KEY') }}"
+    wg_client_pubkey: "{{ lookup('env', 'WG_CLIENT_PUBKEY') }}"
 
   tasks:
 
@@ -100,6 +101,7 @@
         - miniflux
         - gitea
         - goatcounter
+        - calibre
 
     - name: Enable and start Caddy
       systemd:
@@ -197,6 +199,75 @@
     - name: Enable UFW
       ufw:
         state: enabled
+
+    # ── WireGuard ───────────────────────────────────────────────────────────
+
+    - name: Install WireGuard
+      apt:
+        name: wireguard
+        state: present
+      tags: wireguard
+
+    - name: Generate WireGuard server private key
+      shell: wg genkey > /etc/wireguard/server_privatekey && chmod 600 /etc/wireguard/server_privatekey
+      args:
+        creates: /etc/wireguard/server_privatekey
+      tags: wireguard
+
+    - name: Generate WireGuard server public key
+      shell: cat /etc/wireguard/server_privatekey | wg pubkey > /etc/wireguard/server_publickey
+      args:
+        creates: /etc/wireguard/server_publickey
+      tags: wireguard
+
+    - name: Read server private key
+      slurp:
+        src: /etc/wireguard/server_privatekey
+      register: wg_server_privkey
+      tags: wireguard
+
+    - name: Read server public key
+      slurp:
+        src: /etc/wireguard/server_publickey
+      register: wg_server_pubkey
+      tags: wireguard
+
+    - name: Write WireGuard config
+      copy:
+        dest: /etc/wireguard/wg0.conf
+        owner: root
+        group: root
+        mode: '0600'
+        content: |
+          [Interface]
+          PrivateKey = {{ wg_server_privkey.content | b64decode | trim }}
+          Address = 10.100.0.1/24
+          ListenPort = 51820
+
+          [Peer]
+          PublicKey = {{ wg_client_pubkey }}
+          AllowedIPs = 10.100.0.2/32
+      notify: Restart WireGuard
+      tags: wireguard
+
+    - name: Allow WireGuard UDP port
+      ufw:
+        rule: allow
+        port: '51820'
+        proto: udp
+      tags: wireguard
+
+    - name: Enable and start WireGuard
+      systemd:
+        name: wg-quick@wg0
+        enabled: true
+        state: started
+      tags: wireguard
+
+    - name: Display server public key
+      debug:
+        msg: "WireGuard server public key: {{ wg_server_pubkey.content | b64decode | trim }}"
+      tags: wireguard
 
     # ── Docker ──────────────────────────────────────────────────────────────
 
@@ -404,6 +475,83 @@
       tags: hermes
 
 
+    # ── Calibre (kobodl + calibre-web) ────────────────────────────────────
+
+    - name: Create Calibre directory
+      file:
+        path: /opt/calibre
+        state: directory
+        owner: root
+        group: root
+        mode: '0750'
+      tags: calibre
+
+    - name: Copy Calibre docker-compose.yml
+      copy:
+        src: ../calibre/docker-compose.yml
+        dest: /opt/calibre/docker-compose.yml
+        owner: root
+        group: root
+        mode: '0640'
+      tags: calibre
+
+    - name: Pull and start Calibre services
+      command: docker compose up -d --pull always
+      args:
+        chdir: /opt/calibre
+      tags: calibre
+
+    - name: Fix downloads volume ownership
+      command: >
+        docker compose exec -T kobodl
+        chown 1000:1000 /downloads
+      args:
+        chdir: /opt/calibre
+      tags: calibre
+
+    - name: Check if Calibre library exists
+      command: >
+        docker compose exec -T calibre-web
+        test -f /library/metadata.db
+      args:
+        chdir: /opt/calibre
+      register: calibre_db_check
+      changed_when: false
+      failed_when: false
+      tags: calibre
+
+    - name: Initialise Calibre library
+      command: >
+        docker compose exec -T --user abc calibre-web
+        calibredb add --empty --with-library /library/
+      args:
+        chdir: /opt/calibre
+      when: calibre_db_check.rc != 0
+      tags: calibre
+
+    - name: Install calibre-sync script
+      copy:
+        dest: /opt/calibre/sync.sh
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/bin/bash
+          set -euo pipefail
+          cd /opt/calibre
+
+          # Download all books from Kobo
+          docker compose exec -T kobodl kobodl --config /home/config/kobodl.json book get --get-all --output-dir /downloads
+
+          # Import any new EPUBs into Calibre library
+          docker compose exec -T calibre-web sh -c '
+            for f in /downloads/*.epub; do
+              [ -f "$f" ] || continue
+              calibredb add "$f" --with-library /library/ && rm "$f"
+            done
+          '
+      tags: calibre
+
     # ── GoatCounter ─────────────────────────────────────────────────────────
 
     - name: Create goatcounter system user
@@ -559,3 +707,8 @@
       command: docker compose restart
       args:
         chdir: /opt/hermes
+
+    - name: Restart WireGuard
+      systemd:
+        name: wg-quick@wg0
+        state: restarted
