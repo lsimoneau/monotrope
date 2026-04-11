@@ -19,6 +19,7 @@
     hermes_telegram_allowed_users: "{{ lookup('env', 'HERMES_TELEGRAM_ALLOWED_USERS') }}"
     hermes_miniflux_api_key: "{{ lookup('env', 'HERMES_MINIFLUX_API_KEY') }}"
     wg_client_pubkey: "{{ lookup('env', 'WG_CLIENT_PUBKEY') }}"
+    hermes_email_password: "{{ lookup('env', 'HERMES_EMAIL_PASSWORD') }}"
 
   tasks:
 
@@ -478,6 +479,11 @@
           OPENROUTER_API_KEY={{ hermes_openrouter_api_key }}
           TELEGRAM_BOT_TOKEN={{ hermes_telegram_bot_token }}
           TELEGRAM_ALLOWED_USERS={{ hermes_telegram_allowed_users }}
+          EMAIL_ADDRESS=monotrope.agent@gmail.com
+          EMAIL_PASSWORD={{ hermes_email_password }}
+          EMAIL_IMAP_HOST=imap.gmail.com
+          EMAIL_SMTP_HOST=smtp.gmail.com
+          EMAIL_ALLOWED_USERS=simoneau.louis@gmail.com,louissimoneau@fastmail.com
       no_log: true
       tags: hermes
 
