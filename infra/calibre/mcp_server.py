@@ -16,7 +16,7 @@ CALIBRE_CONFIG_DIR = "/config/calibre"
 VENV_BIN = str(Path(sys.executable).parent)
 PATH = os.pathsep.join([VENV_BIN, os.environ.get("PATH", "/usr/bin:/bin")])
 
-mcp = FastMCP("calibre", host="0.0.0.0", port=8000)
+mcp = FastMCP("calibre", host="0.0.0.0", port=8000, stateless_http=True)
 
 
 def _run(cmd: list[str], timeout: int = 120, extra_env: dict | None = None) -> subprocess.CompletedProcess:
@@ -57,8 +57,8 @@ def download_book(book_id: str) -> str:
     result = _run([
         "kobodl", "--config", KOBODL_CONFIG,
         "book", "get",
-        "--book-id", book_id,
         "--output-dir", DOWNLOADS_PATH,
+        book_id,
     ], timeout=300,)
     if result.returncode != 0:
         return f"Error: {result.stderr.strip()}"

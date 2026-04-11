@@ -483,7 +483,7 @@
           EMAIL_PASSWORD={{ hermes_email_password }}
           EMAIL_IMAP_HOST=imap.gmail.com
           EMAIL_SMTP_HOST=smtp.gmail.com
-          EMAIL_ALLOWED_USERS=simoneau.louis@gmail.com,louissimoneau@fastmail.com
+          EMAIL_ALLOWED_USERS=simoneau.louis@gmail.com,louissimoneau@fastmail.com,noreply@kobo.com
       no_log: true
       tags: hermes
 
