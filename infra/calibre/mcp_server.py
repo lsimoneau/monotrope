@@ -1,7 +1,8 @@
 """MCP server exposing calibre-web library and kobodl tools."""
 
-import json
+import os
 import subprocess
+import sys
 from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
@@ -11,11 +12,16 @@ DOWNLOADS_PATH = "/downloads"
 KOBODL_CONFIG = "/home/config/kobodl.json"
 CALIBRE_CONFIG_DIR = "/config/calibre"
 
+# Ensure venv bin (kobodl) and system paths (calibredb) are both available
+VENV_BIN = str(Path(sys.executable).parent)
+PATH = os.pathsep.join([VENV_BIN, os.environ.get("PATH", "/usr/bin:/bin")])
+
 mcp = FastMCP("calibre", host="0.0.0.0", port=8000)
 
 
-def _run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, capture_output=True, text=True, timeout=120, **kwargs)
+def _run(cmd: list[str], timeout: int = 120, extra_env: dict | None = None) -> subprocess.CompletedProcess:
+    env = {"PATH": PATH, **(extra_env or {})}
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
 
 
 @mcp.tool()
@@ -27,7 +33,7 @@ def search_library(query: str) -> str:
         "--search", query,
         "--fields", "title,authors",
         "--line-width", "0",
-    ], env={"CALIBRE_CONFIG_DIRECTORY": CALIBRE_CONFIG_DIR})
+    ], extra_env={"CALIBRE_CONFIG_DIRECTORY": CALIBRE_CONFIG_DIR})
     if result.returncode != 0:
         return f"Error: {result.stderr.strip()}"
     return result.stdout.strip() or "No matching books found."
@@ -53,7 +59,7 @@ def download_book(book_id: str) -> str:
         "book", "get",
         "--book-id", book_id,
         "--output-dir", DOWNLOADS_PATH,
-    ], timeout=300)
+    ], timeout=300,)
     if result.returncode != 0:
         return f"Error: {result.stderr.strip()}"
     # Find the most recently created epub in downloads
@@ -74,7 +80,7 @@ def import_to_library(filename: str) -> str:
     result = _run([
         "calibredb", "add", str(filepath),
         "--with-library", LIBRARY_PATH,
-    ], env={"CALIBRE_CONFIG_DIRECTORY": CALIBRE_CONFIG_DIR})
+    ], extra_env={"CALIBRE_CONFIG_DIRECTORY": CALIBRE_CONFIG_DIR})
     if result.returncode != 0:
         return f"Error: {result.stderr.strip()}"
     return result.stdout.strip() or f"Imported {filename} successfully."

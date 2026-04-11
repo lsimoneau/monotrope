@@ -14,7 +14,7 @@ services:
     volumes:
       - hermes_data:/opt/data
       - ./plugins:/opt/data/plugins:ro
-      - ./skills:/opt/data/skills:ro
+      - ./skills:/opt/data/skills
     environment:
       OPENROUTER_API_KEY: "${OPENROUTER_API_KEY}"
       TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN}"
