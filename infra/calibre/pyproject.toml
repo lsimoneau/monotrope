@@ -1,0 +1,14 @@
+[project]
+name = "calibre-mcp"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "mcp[cli]",
+    "kobodl",
+]
+
+[project.scripts]
+calibre-mcp = "mcp_server:main"
+
+[tool.uv]
+package = true

@@ -6,4 +6,9 @@ memory:
   user_profile_enabled: true
 agent:
   max_turns: 70
+mcp_servers:
+  calibre:
+    url: "http://calibre-web:8000/mcp"
+    tools:
+      include: [search_library, list_kobo_books, download_book, import_to_library]
 TELEGRAM_HOME_CHANNEL: '8455090116'

@@ -1,4 +1,4 @@
-.PHONY: build serve deploy ssh setup miniflux gitea goatcounter hermes hermes-sync hermes-chat enrich wireguard calibre calibre-sync koinsight
+.PHONY: build serve deploy ssh setup miniflux gitea goatcounter hermes hermes-sync hermes-chat enrich wireguard calibre calibre-build calibre-sync koinsight
 
 # Load .env if it exists
 -include .env
@@ -70,7 +70,11 @@ wireguard:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
 	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags wireguard
 
-calibre:
+calibre-build:
+	docker build -t git.monotrope.au/louis/calibre-web:latest infra/calibre/
+	docker push git.monotrope.au/louis/calibre-web:latest
+
+calibre: calibre-build
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
 	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags calibre
 

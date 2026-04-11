@@ -442,6 +442,17 @@
       notify: Restart Hermes
       tags: hermes
 
+    - name: Copy Hermes skills
+      copy:
+        src: ../hermes/skills/
+        dest: /opt/hermes/skills/
+        owner: root
+        group: root
+        mode: '0640'
+        directory_mode: '0750'
+      notify: Restart Hermes
+      tags: hermes
+
     - name: Write Miniflux plugin config
       copy:
         dest: /opt/hermes/plugins/miniflux/config.json
@@ -477,7 +488,7 @@
       tags: hermes
 
 
-    # ── Calibre (kobodl + calibre-web) ────────────────────────────────────
+    # ── Calibre (calibre-web + kobodl + MCP server) ──────────────────────
 
     - name: Create Calibre directory
       file:
@@ -499,14 +510,6 @@
 
     - name: Pull and start Calibre services
       command: docker compose up -d --pull always
-      args:
-        chdir: /opt/calibre
-      tags: calibre
-
-    - name: Fix downloads volume ownership
-      command: >
-        docker compose exec -T kobodl
-        chown 1000:1000 /downloads
       args:
         chdir: /opt/calibre
       tags: calibre
@@ -543,7 +546,8 @@
           cd /opt/calibre
 
           # Download all books from Kobo
-          docker compose exec -T kobodl kobodl --config /home/config/kobodl.json book get --get-all --output-dir /downloads
+          docker compose exec -T --user abc calibre-web \
+            kobodl --config /home/config/kobodl.json book get --get-all --output-dir /downloads
 
           # Import any new EPUBs into Calibre library
           # Files are kept in /downloads so kobodl can skip them next run

@@ -1,23 +1,6 @@
 services:
-  kobodl:
-    image: ghcr.io/subdavis/kobodl
-    restart: unless-stopped
-    user: "1000:1000"
-    command: --config /home/config/kobodl.json serve --host 0.0.0.0 --output-dir /downloads
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    volumes:
-      - kobodl_config:/home/config
-      - downloads:/downloads
-    networks:
-      - default
-      - monotrope
-
   calibre-web:
-    image: lscr.io/linuxserver/calibre-web:latest
+    image: git.monotrope.au/louis/calibre-web:latest
     restart: unless-stopped
     logging:
       driver: json-file
@@ -28,6 +11,7 @@ services:
       - "127.0.0.1:8083:8083"
     volumes:
       - calibre_config:/config
+      - kobodl_config:/home/config
       - library:/library
       - downloads:/downloads
     environment:
@@ -35,6 +19,9 @@ services:
       PGID: "1000"
       TZ: "Australia/Sydney"
       DOCKER_MODS: "linuxserver/mods:universal-calibre"
+    networks:
+      - default
+      - monotrope
 
 networks:
   default:
@@ -42,7 +29,7 @@ networks:
     external: true
 
 volumes:
-  kobodl_config:
   calibre_config:
+  kobodl_config:
   library:
   downloads:
