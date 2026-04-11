@@ -102,6 +102,7 @@
         - gitea
         - goatcounter
         - calibre
+        - koinsight
 
     - name: Enable and start Caddy
       systemd:
@@ -547,12 +548,39 @@
           # Import any new EPUBs into Calibre library
           # Files are kept in /downloads so kobodl can skip them next run
           docker compose exec -T --user abc calibre-web sh -c '
+            export CALIBRE_CONFIG_DIRECTORY=/config/calibre
             for f in /downloads/*.epub; do
               [ -f "$f" ] || continue
               calibredb add "$f" --with-library /library/ || true
             done
           '
       tags: calibre
+
+    # ── KoInsight ──────────────────────────────────────────────────────────
+
+    - name: Create KoInsight directory
+      file:
+        path: /opt/koinsight
+        state: directory
+        owner: root
+        group: root
+        mode: '0750'
+      tags: koinsight
+
+    - name: Copy KoInsight docker-compose.yml
+      copy:
+        src: ../koinsight/docker-compose.yml
+        dest: /opt/koinsight/docker-compose.yml
+        owner: root
+        group: root
+        mode: '0640'
+      tags: koinsight
+
+    - name: Pull and start KoInsight
+      command: docker compose up -d --pull always
+      args:
+        chdir: /opt/koinsight
+      tags: koinsight
 
     # ── GoatCounter ─────────────────────────────────────────────────────────
 

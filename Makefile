@@ -1,4 +1,4 @@
-.PHONY: build serve deploy ssh setup miniflux gitea goatcounter hermes hermes-sync hermes-chat enrich wireguard calibre calibre-sync
+.PHONY: build serve deploy ssh setup miniflux gitea goatcounter hermes hermes-sync hermes-chat enrich wireguard calibre calibre-sync koinsight
 
 # Load .env if it exists
 -include .env
@@ -77,6 +77,10 @@ calibre:
 calibre-sync:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
 	ssh root@$(MONOTROPE_HOST) /opt/calibre/sync.sh
+
+koinsight:
+	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
+	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags koinsight
 
 enrich:
 	uv run enrich.py

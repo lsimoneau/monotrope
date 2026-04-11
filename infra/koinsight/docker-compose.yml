@@ -1,0 +1,16 @@
+services:
+  koinsight:
+    image: ghcr.io/georgesg/koinsight:latest
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    ports:
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - data:/app/data
+
+volumes:
+  data:

@@ -74,6 +74,20 @@ books.monotrope.au {
 	encode zstd gzip
 }
 
+# KoInsight reading stats
+koinsight.monotrope.au {
+	reverse_proxy localhost:3001
+
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+
+	encode zstd gzip
+}
+
 # GoatCounter analytics
 stats.monotrope.au {
 	reverse_proxy localhost:8081
