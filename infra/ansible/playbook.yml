@@ -443,7 +443,7 @@
       notify: Restart Hermes
       tags: hermes
 
-    - name: Copy Hermes skills
+    - name: Copy Hermes skills (only if missing — Hermes self-modifies skills, don't clobber)
       copy:
         src: ../hermes/skills/
         dest: /opt/hermes/skills/
@@ -451,6 +451,7 @@
         group: root
         mode: '0640'
         directory_mode: '0750'
+        force: no
       notify: Restart Hermes
       tags: hermes
 
