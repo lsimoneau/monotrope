@@ -26,7 +26,7 @@ def _run(cmd: list[str], timeout: int = 120, extra_env: dict | None = None) -> s
 
 @mcp.tool()
 def search_library(query: str) -> str:
-    """Search the calibre library by title or author. Use this to check if a book already exists before importing."""
+    """Search the LOCAL calibre library by title or author. Returns calibre entry IDs (numeric, e.g. 42). Use this — not list_kobo_books — to check if a book is already imported."""
     result = _run([
         "calibredb", "list",
         "--with-library", LIBRARY_PATH,
@@ -41,7 +41,7 @@ def search_library(query: str) -> str:
 
 @mcp.tool()
 def list_kobo_books() -> str:
-    """List all books available for download from the Kobo account."""
+    """List books available for DOWNLOAD from the remote Kobo store account. These are NOT in the local calibre library yet. Returns Kobo product IDs (UUIDs). Use download_book + import_to_library to add them to calibre."""
     result = _run([
         "kobodl", "--config", KOBODL_CONFIG,
         "book", "list",

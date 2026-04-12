@@ -34,11 +34,13 @@ metadata:
 3. Download and import as above
 
 ## Pitfalls
+- **TWO DIFFERENT DATA SOURCES**: `mcp_calibre_search_library` checks the LOCAL calibre library (returns numeric IDs like 42). `mcp_calibre_list_kobo_books` lists the REMOTE Kobo store account (returns UUIDs). A book appearing in `list_kobo_books` does NOT mean it's in the library — it means it's available for download. You MUST call `search_library` to check if it's already imported.
 - Never use bulk download — always download one book at a time by product ID
 - Multi-book orders: receipts may contain multiple books, process each separately
 - Title matching is fuzzy — the receipt title may not exactly match the Kobo product listing, use your judgement
 - If a book doesn't appear in `list_kobo_books` yet, it may not have synced — wait a few minutes and try once more
 - Always confirm the import succeeded by searching the library after importing
+- If `search_library` returns "No matching books found", the book is NOT in the library and should be downloaded and imported
 
 ## Verification
 After importing, search the library for the book title. Report the result to the user with title, author, and confirmation it's in the library.
