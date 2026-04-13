@@ -1,3 +1,5 @@
 ---
 title: Reading
+aliases:
+- /reviews/
 ---

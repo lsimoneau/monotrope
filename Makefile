@@ -7,7 +7,7 @@ export
 DEPLOY_USER := deploy
 MONOTROPE_HOST ?=
 
-build: enrich
+build:
 	cd site && hugo --minify
 
 serve:

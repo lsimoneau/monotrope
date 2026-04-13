@@ -1,14 +1,17 @@
 ---
-book_author: Aisling Rawle
+author: Aisling Rawle
 cover: /covers/the-compound.jpg
-date: 2026-04-08
-date_read: March 2026
+date: 2026-03-29
 isbn: '9780008710088'
-rating: 4
+rating: 4.5
+status: finished
+publish: true
 tags:
 - dystopia
 - satire
 title: The Compound
+aliases:
+- /reviews/the-compound/
 ---
 
 _The Compound_ is a hell of a vibe. It's compulsively readable while also being creepy as fuck.

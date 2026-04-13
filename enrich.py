@@ -16,7 +16,7 @@ from pathlib import Path
 
 import frontmatter
 
-REVIEWS_DIR = Path(__file__).parent / "site" / "content" / "reviews"
+REVIEWS_DIR = Path(__file__).parent / "site" / "content" / "books"
 COVERS_DIR = Path(__file__).parent / "site" / "static" / "covers"
 
 OL_SEARCH = "https://openlibrary.org/search.json"
@@ -59,7 +59,7 @@ def enrich(path: Path, dry_run: bool = False) -> None:
     """Enrich a single review file with ISBN and cover."""
     post = frontmatter.load(path)
     title = post.get("title", "")
-    author = post.get("book_author", "")
+    author = post.get("author", "")
 
     has_isbn = bool(post.get("isbn"))
     has_cover = bool(post.get("cover"))
