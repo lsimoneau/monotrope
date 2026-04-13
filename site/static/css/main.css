@@ -929,4 +929,8 @@ article hr {
   .book-meta .meta-key {
     display: none;
   }
+
+  .goal-panel .month-chart {
+    display: none;
+  }
 }
