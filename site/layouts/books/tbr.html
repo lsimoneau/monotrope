@@ -1,0 +1,19 @@
+{{ define "main" }}
+{{ $allBooks := where site.RegularPages "Section" "books" }}
+{{ $tbr := where $allBooks "Params.status" "tbr" }}
+
+<header class="year-header">
+  <h1 class="year-kicker">/<a href="/books/">books</a>/tbr</h1>
+</header>
+
+<p class="section-label">to read</p>
+
+<ul class="tbr-list">
+  {{ range $tbr.ByTitle }}
+  <li>
+    <span class="tbr-title">{{ .Title }}</span>
+    {{ with .Params.author }}<span class="tbr-author">{{ . }}</span>{{ end }}
+  </li>
+  {{ end }}
+</ul>
+{{ end }}

@@ -611,6 +611,293 @@ article hr {
   color: var(--green);
 }
 
+/* ── Year nav (books list) ─────────────────────── */
+.year-nav {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  margin-bottom: 2.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1rem;
+}
+
+.year-nav a {
+  color: var(--fg-dim);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.year-nav a::before {
+  content: '/ ';
+  color: var(--green-dim);
+}
+
+.year-nav a:hover {
+  color: var(--green);
+}
+
+/* ── Stats-only title (non-linked entries) ─────── */
+.review-entry .review-title {
+  color: var(--fg-dim);
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+/* ── TBR list ──────────────────────────────────── */
+.tbr-list {
+  list-style: none;
+}
+
+.tbr-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+  padding-left: 1rem;
+  position: relative;
+}
+
+.tbr-list li::before {
+  content: '·';
+  position: absolute;
+  left: 0;
+  color: var(--green-dim);
+}
+
+.tbr-list .tbr-title {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  color: var(--fg);
+  line-height: 1.35;
+}
+
+.tbr-list .tbr-author {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--fg-dim);
+  font-style: italic;
+}
+
+/* ── Now reading ───────────────────────────────── */
+.now-reading {
+  margin-bottom: 2.5rem;
+  font-family: var(--font-mono);
+}
+
+.now-reading .section-label {
+  margin-bottom: 0.6rem;
+}
+
+.now-reading ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.now-reading li {
+  font-size: 0.72rem;
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+}
+
+.now-reading li::before {
+  content: '> ';
+  color: var(--green);
+}
+
+.now-reading .nr-title {
+  color: var(--fg-dim);
+}
+
+.now-reading .nr-author {
+  color: var(--muted);
+  font-size: 0.65rem;
+  font-style: italic;
+  margin-left: 0.4rem;
+}
+
+.now-reading .nr-author::before {
+  content: '· ';
+  font-style: normal;
+  color: var(--border);
+}
+
+/* ── Year page ─────────────────────────────────── */
+.year-header {
+  margin-bottom: 2.5rem;
+}
+
+.year-kicker {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  margin-bottom: 0.35rem;
+}
+
+.year-kicker::before {
+  content: '~';
+  color: var(--green-dim);
+}
+
+.year-kicker a {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.year-kicker a:hover {
+  color: var(--green);
+}
+
+.year-title {
+  font-family: var(--font-serif);
+  font-size: 1.65rem;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--fg);
+}
+
+.goal-panel {
+  margin-bottom: 3.5rem;
+}
+
+.goal-panel::after {
+  content: '';
+  display: block;
+  clear: both;
+}
+
+.goal-panel .month-chart {
+  float: right;
+  margin: 0 0 0 1.5rem;
+  min-width: 7rem;
+}
+
+.goal-body {
+  border-left: 2px solid var(--green-dim);
+  padding: 1rem 0 1.1rem 1.25rem;
+}
+
+.goal-stat {
+  font-family: var(--font-mono);
+  font-size: 1.35rem;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.35em;
+}
+
+.goal-num {
+  color: var(--green);
+  font-weight: 500;
+}
+
+.goal-sep {
+  color: var(--muted);
+}
+
+.goal-target {
+  color: var(--fg-dim);
+}
+
+.goal-unit {
+  font-size: 0.7rem;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  margin-left: 0.2em;
+}
+
+.goal-bar {
+  font-family: var(--font-mono);
+  color: var(--amber);
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.55rem;
+}
+
+.goal-pct {
+  color: var(--muted);
+  margin-left: 0.7rem;
+  letter-spacing: 0.02em;
+  font-size: 0.68rem;
+}
+
+.goal-pace {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--fg-dim);
+  letter-spacing: 0.03em;
+}
+
+.month-chart {
+  list-style: none;
+  font-family: var(--font-mono);
+  margin-bottom: 3.5rem;
+  line-height: 1.5;
+}
+
+.month-chart li {
+  display: grid;
+  grid-template-columns: 2rem max-content 1.3rem;
+  gap: 0.6rem;
+  align-items: baseline;
+}
+
+.month-chart .month-name {
+  color: var(--muted);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+}
+
+.month-chart .month-bars {
+  color: var(--amber);
+  letter-spacing: 0.1em;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.month-chart .month-count {
+  color: var(--fg-dim);
+  font-size: 0.64rem;
+  text-align: left;
+}
+
+.month-chart li:has(.month-bars:empty) .month-count {
+  color: var(--border);
+}
+
+.month-head {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  margin: 2.5rem 0 1.1rem;
+}
+
+.month-head::before {
+  content: '// ';
+  color: var(--green-dim);
+}
+
+.year-months > :first-child.month-head,
+.year-months .month-head:first-of-type {
+  margin-top: 0;
+}
+
+.review-list.year-list li {
+  grid-template-columns: 2.2rem 1fr;
+  margin-bottom: 1.4rem;
+}
+
 /* ── Responsive ────────────────────────────────── */
 @media (max-width: 540px) {
   html { font-size: 16px; }

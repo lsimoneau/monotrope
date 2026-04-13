@@ -1,0 +1,112 @@
+{{ define "main" }}
+{{ $year := .Params.year }}
+{{ $goal := index hugo.Data.reading_goals (string $year) }}
+{{ $allBooks := where site.RegularPages "Section" "books" }}
+{{ $finished := where $allBooks "Params.status" "finished" }}
+{{ $yearBooks := where $finished "Date.Year" $year }}
+{{ $count := len $yearBooks }}
+
+<header class="year-header">
+  <h1 class="year-kicker">/<a href="/books/">books</a>/{{ $year }}</h1>
+</header>
+
+{{ if eq (int now.Year) $year }}
+{{ $reading := where $allBooks "Params.status" "reading" }}
+{{ with $reading }}
+<section class="now-reading">
+  <p class="section-label">now reading</p>
+  <ul>
+    {{ range . }}
+    <li>
+      <span class="nr-title">{{ .Title }}</span>
+      {{ with .Params.author }}<span class="nr-author">{{ . }}</span>{{ end }}
+    </li>
+    {{ end }}
+  </ul>
+</section>
+{{ end }}
+{{ end }}
+
+{{ with $goal }}
+{{ $target := .books }}
+{{ $barWidth := 24 }}
+{{ $filled := 0 }}
+{{ $pctNum := 0 }}
+{{ if gt $target 0 }}
+{{ $pctNum = math.Round (mul (div (float $count) (float $target)) 100) }}
+{{ $f := math.Floor (div (mul (float $count) $barWidth) (float $target)) }}
+{{ $filled = cond (gt (int $f) $barWidth) $barWidth (int $f) }}
+{{ end }}
+{{ $empty := sub $barWidth $filled }}
+<section class="goal-panel">
+  {{/* monthly counts — build dict, render fixed 12 rows floated right */}}
+  {{ $counts := dict }}
+  {{ range $yearBooks }}
+  {{ $k := .Date.Format "January" }}
+  {{ $existing := default 0 (index $counts $k) }}
+  {{ $counts = merge $counts (dict $k (add $existing 1)) }}
+  {{ end }}
+  {{ $months := slice "January" "February" "March" "April" "May" "June" "July" "August" "September" "October" "November"
+  "December" }}
+  <ul class="month-chart">
+    {{ range $months }}
+    {{ $n := default 0 (index $counts .) }}
+    <li>
+      <span class="month-name">{{ substr . 0 3 | lower }}</span>
+      <span class="month-bars">{{ strings.Repeat $n "▓" }}</span>
+      <span class="month-count">{{ if eq $n 0 }}·{{ else }}{{ $n }}{{ end }}</span>
+    </li>
+    {{ end }}
+  </ul>
+  <div class="goal-body">
+    <p class="goal-stat">
+      <span class="goal-num">{{ $count }}</span><span class="goal-sep">&nbsp;/&nbsp;</span><span class="goal-target">{{
+        $target }}</span>
+      <span class="goal-unit">books</span>
+    </p>
+    <p class="goal-bar">{{ strings.Repeat $filled "▓" }}{{ strings.Repeat $empty "░" }}<span class="goal-pct">{{ $pctNum
+        }}%</span></p>
+    {{ $now := now }}
+    {{ if eq $now.Year $year }}
+    {{ $remaining := sub $target $count }}
+    {{ $monthsLeft := add (sub 12 (int $now.Month)) 1 }}
+    {{ if and (gt $remaining 0) (gt $monthsLeft 0) }}
+    {{ $pace := math.Ceil (div (float $remaining) (float $monthsLeft)) }}
+    <p class="goal-pace">{{ $remaining }} to go · {{ $pace }}/month</p>
+    {{ else if le $remaining 0 }}
+    <p class="goal-pace">goal met</p>
+    {{ end }}
+    {{ else if gt $now.Year $year }}
+    {{ if ge $count $target }}
+    <p class="goal-pace">final · goal met</p>
+    {{ else }}
+    <p class="goal-pace">final · {{ $count }} of {{ $target }}</p>
+    {{ end }}
+    {{ else }}
+    <p class="goal-pace">year ahead</p>
+    {{ end }}
+  </div>
+</section>
+{{ end }}
+
+<section class="year-months">
+  {{ range ($yearBooks.GroupByDate "January") }}
+  <h3 class="month-head">{{ .Key | lower }}</h3>
+  <ul class="review-list year-list">
+    {{ range .Pages.ByDate.Reverse }}
+    <li>
+      <span class="review-date">{{ .Date.Format "02" }}</span>
+      <div class="review-entry">
+        {{ if .Params.publish }}<a href="{{ .RelPermalink }}">{{ .Title }}</a>{{ else }}<span class="review-title">{{
+          .Title }}</span>{{ end }}
+        {{ with .Params.author }}<span class="review-author">{{ . }}</span>{{ end }}
+        {{ with .Params.rating }}
+        <span class="review-rating">{{ partial "rating-blocks.html" . }}<span class="rating-num">{{ . }}/5</span></span>
+        {{ end }}
+      </div>
+    </li>
+    {{ end }}
+  </ul>
+  {{ end }}
+</section>
+{{ end }}

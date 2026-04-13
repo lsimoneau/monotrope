@@ -33,19 +33,21 @@
   <section>
     <div class="home-section-head">
       <h2>reading</h2>
-      <a class="see-all" href="/reviews/">all reviews</a>
+      <a class="see-all" href="/books/">all books</a>
     </div>
     <ul class="review-list">
-      {{ range first 3 (where .Site.RegularPages "Section" "reviews").ByDate.Reverse }}
-      {{ $rating := .Params.rating | default 0 }}
+      {{ $reviews := where .Site.RegularPages "Section" "books" }}
+      {{ $reviews = where $reviews "Params.publish" true }}
+      {{ range first 3 $reviews.ByDate.Reverse }}
       <li>
-        <span class="review-date">{{ .Params.date_read | default (.Date.Format "2006-01") }}</span>
+        <span class="review-date">{{ .Date.Format "2006-01" }}</span>
         <div class="review-entry">
-          <a href="{{ .RelPermalink }}">{{ .Title }}</a>
-          {{ with .Params.book_author }}<span class="review-author">{{ . }}</span>{{ end }}
-          <span class="review-rating">
-            {{- strings.Repeat $rating "▓" -}}{{- strings.Repeat (sub 5 $rating) "░" -}}
-          </span>
+          {{ if .Params.publish }}<a href="{{ .RelPermalink }}">{{ .Title }}</a>{{ else }}<span class="review-title">{{
+            .Title }}</span>{{ end }}
+          {{ with .Params.author }}<span class="review-author">{{ . }}</span>{{ end }}
+          {{ with .Params.rating }}
+          <span class="review-rating">{{ partial "rating-blocks.html" . }}</span>
+          {{ end }}
         </div>
       </li>
       {{ end }}

@@ -4,17 +4,17 @@
   <h1>{{ .Title }}</h1>
 
   <div class="book-meta">
-    {{ with .Params.book_author }}
+    {{ with .Params.author }}
     <span class="meta-key">author</span>
     <span class="meta-val author">{{ . }}</span>
     {{ end }}
 
     <span class="meta-key">read</span>
-    <span class="meta-val">{{ .Params.date_read | default (.Date.Format "January 2006") }}</span>
+    <span class="meta-val">{{ .Date.Format "January 2006" }}</span>
 
     <span class="meta-key">rating</span>
     <span class="meta-val">
-      <span class="rating-blocks">{{- strings.Repeat $rating "▓" -}}{{- strings.Repeat (sub 5 $rating) "░" -}}</span>
+      <span class="rating-blocks">{{ partial "rating-blocks.html" $rating }}</span>
       <span class="rating-num">{{ $rating }}/5</span>
     </span>
 

@@ -1,0 +1,4 @@
+{{- $r := . -}}
+{{- $full := int $r -}}
+{{- $hasHalf := gt (sub $r $full) 0 -}}
+{{- strings.Repeat $full "▓" -}}{{- if $hasHalf -}}▒{{- end -}}
