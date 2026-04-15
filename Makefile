@@ -67,7 +67,11 @@ hermes-sync:
 
 hermes-chat:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ssh -t root@$(MONOTROPE_HOST) docker exec -it hermes hermes chat
+	ssh -t root@$(MONOTROPE_HOST) "docker exec -it -u 10000 hermes bash -c '. /opt/hermes/.venv/bin/activate && hermes chat'"
+
+hermes-cli:
+	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
+	ssh -t root@$(MONOTROPE_HOST) "docker exec -it -u 10000 hermes bash -c '. /opt/hermes/.venv/bin/activate && hermes $(ARGS)'"
 
 
 wireguard:

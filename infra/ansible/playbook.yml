@@ -20,6 +20,7 @@
     hermes_miniflux_api_key: "{{ lookup('env', 'HERMES_MINIFLUX_API_KEY') }}"
     wg_client_pubkey: "{{ lookup('env', 'WG_CLIENT_PUBKEY') }}"
     hermes_email_password: "{{ lookup('env', 'HERMES_EMAIL_PASSWORD') }}"
+    hermes_email_allowed_users: "{{ lookup('env', 'HERMES_EMAIL_ALLOWED_USERS') | default('simoneau.louis@gmail.com,louissimoneau@fastmail.com,noreply@kobo.com,louis@monotrope.au', true) }}"
 
   tasks:
 
@@ -450,6 +451,11 @@
       notify: Restart Hermes
       tags: hermes
 
+    - name: Ensure config.yaml is readable by hermes user inside container
+      command: docker exec -u 0 hermes chmod 644 /opt/data/config.yaml
+      notify: Restart Hermes
+      tags: hermes
+
     - name: Copy Hermes plugins
       copy:
         src: ../hermes/plugins/
@@ -465,8 +471,8 @@
       copy:
         src: ../hermes/skills/
         dest: /opt/hermes/skills/
-        owner: root
-        group: root
+        owner: '10000'
+        group: '10000'
         mode: '0640'
         directory_mode: '0750'
         force: no
@@ -502,7 +508,7 @@
           EMAIL_PASSWORD={{ hermes_email_password }}
           EMAIL_IMAP_HOST=imap.gmail.com
           EMAIL_SMTP_HOST=smtp.gmail.com
-          EMAIL_ALLOWED_USERS=simoneau.louis@gmail.com,louissimoneau@fastmail.com,noreply@kobo.com
+          EMAIL_ALLOWED_USERS={{ hermes_email_allowed_users }}
       no_log: true
       tags: hermes
 

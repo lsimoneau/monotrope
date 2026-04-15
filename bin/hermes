@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ -f "$(dirname "$0")/../.env" ]; then
+    set -a
+    . "$(dirname "$0")/../.env"
+    set +a
+fi
+
+: "${MONOTROPE_HOST:?MONOTROPE_HOST is not set}"
+
+exec ssh -t root@"$MONOTROPE_HOST" "docker exec -it -u 10000 hermes bash -c '. /opt/hermes/.venv/bin/activate && hermes $*'"

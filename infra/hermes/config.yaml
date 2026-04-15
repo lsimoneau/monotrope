@@ -1,6 +1,6 @@
 model:
   provider: openrouter
-  default: openrouter/auto
+  default: google/gemma-4-26b-a4b-it
 memory:
   memory_enabled: true
   user_profile_enabled: true
@@ -16,4 +16,4 @@ mcp_servers:
       - download_book
       - import_to_library
 TELEGRAM_HOME_CHANNEL: '8455090116'
-EMAIL_HOME_CHANNEL: simoneau.louis@gmail.com
+EMAIL_HOME_CHANNEL: louis@monotrope.au
