@@ -1,4 +1,4 @@
-.PHONY: build serve deploy ssh setup miniflux gitea goatcounter hermes hermes-sync hermes-chat enrich wireguard calibre calibre-build calibre-sync koinsight
+.PHONY: build serve deploy ssh setup infra logs miniflux gitea goatcounter hermes hermes-sync hermes-chat hermes-cli enrich wireguard calibre calibre-build calibre-sync koinsight
 
 # Load .env if it exists
 -include .env
@@ -21,9 +21,13 @@ ssh:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
 	ssh $(DEPLOY_USER)@$(MONOTROPE_HOST)
 
-setup:
+setup infra:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
 	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml
+
+logs:
+	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
+	ssh -t root@$(MONOTROPE_HOST) mlogs $(ARGS)
 
 miniflux:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)

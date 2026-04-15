@@ -307,6 +307,24 @@
         state: present
         update_cache: true
 
+    - name: Configure Docker to log to journald
+      copy:
+        dest: /etc/docker/daemon.json
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          {
+            "log-driver": "journald"
+          }
+      register: docker_daemon_config
+
+    - name: Restart Docker after daemon.json change
+      systemd:
+        name: docker
+        state: restarted
+      when: docker_daemon_config.changed
+
     - name: Enable Docker
       systemd:
         name: docker
@@ -690,6 +708,125 @@
         state: started
         daemon_reload: true
       tags: goatcounter
+
+    # ── Log driver migration ────────────────────────────────────────────────
+
+    - name: Force-recreate existing compose stacks to pick up journald driver
+      command: docker compose up -d --force-recreate
+      args:
+        chdir: "{{ item }}"
+      loop:
+        - /opt/miniflux
+        - /opt/gitea
+        - /opt/hermes
+        - /opt/calibre
+        - /opt/koinsight
+      when: docker_daemon_config.changed
+
+    # ── Unified log viewer ──────────────────────────────────────────────────
+
+    - name: Install mlogs script
+      tags: logging
+      copy:
+        dest: /usr/local/bin/mlogs
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          {% raw %}#!/usr/bin/env python3
+          # Unified coloured tail for monotrope services.
+          # Reads journald (for Caddy, GoatCounter, and all container stdout)
+          # plus Hermes's internal log files (gateway.log, agent.log) which
+          # are written inside the container, not to stdout.
+          import json, os, re, subprocess, sys, threading
+
+          COLORS = {
+              "caddy":        "\033[36m",
+              "goatcounter":  "\033[35m",
+              "hermes-gw":    "\033[93m",
+              "hermes-agent": "\033[33m",
+              "hermes":       "\033[33m",
+              "miniflux":     "\033[32m",
+              "gitea":        "\033[34m",
+              "calibre":      "\033[31m",
+              "koinsight":    "\033[37m",
+          }
+          RESET = "\033[0m"
+          ANSI = re.compile(r"\x1b\[[0-9;]*m")
+          lock = threading.Lock()
+
+          def emit(svc, msg):
+              key = next((k for k in COLORS if svc.startswith(k)), None)
+              color = COLORS.get(key, "\033[90m")
+              with lock:
+                  print(f"{color}[{svc:<13}]{RESET} {ANSI.sub('', msg)}", flush=True)
+
+          def hermes_data_path():
+              try:
+                  out = subprocess.check_output(
+                      ["docker", "inspect", "hermes", "-f",
+                       '{{range .Mounts}}{{if eq .Destination "/opt/data"}}{{.Source}}{{end}}{{end}}'],
+                      text=True, stderr=subprocess.DEVNULL,
+                  ).strip()
+                  return out or None
+              except Exception:
+                  return None
+
+          def tail_journal(extra):
+              filters = ["_SYSTEMD_UNIT=caddy.service", "+", "_SYSTEMD_UNIT=goatcounter.service"]
+              try:
+                  names = subprocess.check_output(
+                      ["docker", "ps", "--format", "{{.Names}}"], text=True
+                  ).split()
+              except Exception:
+                  names = []
+              for n in names:
+                  filters += ["+", f"CONTAINER_NAME={n}"]
+              cmd = ["journalctl", "-f", "-o", "json",
+                     "--output-fields=_SYSTEMD_UNIT,CONTAINER_NAME,MESSAGE"] + filters + extra
+              p = subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True)
+              for line in p.stdout:
+                  try:
+                      e = json.loads(line)
+                  except Exception:
+                      continue
+                  svc = e.get("CONTAINER_NAME") or e.get("_SYSTEMD_UNIT", "").replace(".service", "") or "?"
+                  msg = e.get("MESSAGE", "")
+                  if isinstance(msg, list):
+                      msg = bytes(msg).decode("utf-8", "replace")
+                  emit(svc, msg)
+
+          def tail_file(path, svc):
+              if not path or not os.path.isfile(path):
+                  emit("mlogs", f"skipping {svc}: {path} not found")
+                  return
+              p = subprocess.Popen(
+                  ["tail", "-F", "-n", "0", path],
+                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+              )
+              for line in p.stdout:
+                  emit(svc, line.rstrip("\n"))
+
+          def main():
+              extra = sys.argv[1:]
+              threads = [threading.Thread(target=tail_journal, args=(extra,), daemon=True)]
+              hd = hermes_data_path()
+              if hd:
+                  for rel, svc in [("logs/gateway.log", "hermes-gw"),
+                                   ("logs/agent.log",   "hermes-agent")]:
+                      threads.append(threading.Thread(
+                          target=tail_file, args=(os.path.join(hd, rel), svc), daemon=True))
+              for t in threads:
+                  t.start()
+              try:
+                  for t in threads:
+                      t.join()
+              except KeyboardInterrupt:
+                  pass
+
+          if __name__ == "__main__":
+              main()
+          {% endraw %}
 
     # ── Deploy user ──────────────────────────────────────────────────────────
 

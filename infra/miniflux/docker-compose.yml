@@ -2,11 +2,6 @@ services:
   miniflux:
     image: miniflux/miniflux:2.2.19
     restart: unless-stopped
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
     depends_on:
       db:
         condition: service_healthy
@@ -28,11 +23,6 @@ services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
     volumes:
       - miniflux_db:/var/lib/postgresql/data
     environment:
