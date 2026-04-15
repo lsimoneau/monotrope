@@ -21,6 +21,7 @@
     wg_client_pubkey: "{{ lookup('env', 'WG_CLIENT_PUBKEY') }}"
     hermes_email_password: "{{ lookup('env', 'HERMES_EMAIL_PASSWORD') }}"
     hermes_email_allowed_users: "{{ lookup('env', 'HERMES_EMAIL_ALLOWED_USERS') | default('simoneau.louis@gmail.com,louissimoneau@fastmail.com,noreply@kobo.com,louis@monotrope.au', true) }}"
+    wallabag_secret: "{{ lookup('env', 'WALLABAG_SECRET') }}"
 
   tasks:
 
@@ -42,6 +43,31 @@
           - ufw
           - unattended-upgrades
         state: present
+
+    # ── Swap ────────────────────────────────────────────────────────────────
+
+    - name: Create swapfile
+      shell: |
+        fallocate -l 1G /swapfile
+        chmod 600 /swapfile
+        mkswap /swapfile
+        swapon /swapfile
+      args:
+        creates: /swapfile
+
+    - name: Persist swapfile in fstab
+      lineinfile:
+        path: /etc/fstab
+        line: '/swapfile none swap sw 0 0'
+        state: present
+
+    - name: Set vm.swappiness to 10
+      sysctl:
+        name: vm.swappiness
+        value: '10'
+        state: present
+        sysctl_set: true
+        reload: true
 
     - name: Configure unattended-upgrades
       copy:
@@ -105,6 +131,7 @@
         - goatcounter
         - calibre
         - koinsight
+        - wallabag
 
     - name: Enable and start Caddy
       systemd:
@@ -331,6 +358,47 @@
         name: docker
         enabled: true
         state: started
+
+    - name: Install docker-prune systemd service
+      copy:
+        dest: /etc/systemd/system/docker-prune.service
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Prune unused Docker images and build cache
+          Requires=docker.service
+          After=docker.service
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/bin/docker image prune -af --filter until=48h
+          ExecStart=/usr/bin/docker builder prune -af --filter until=48h
+
+    - name: Install docker-prune systemd timer
+      copy:
+        dest: /etc/systemd/system/docker-prune.timer
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Weekly Docker image prune
+
+          [Timer]
+          OnCalendar=weekly
+          Persistent=true
+
+          [Install]
+          WantedBy=timers.target
+
+    - name: Enable and start docker-prune timer
+      systemd:
+        name: docker-prune.timer
+        enabled: true
+        state: started
+        daemon_reload: true
 
     - name: Create shared Docker network
       command: docker network create monotrope
@@ -617,6 +685,43 @@
         chdir: /opt/koinsight
       tags: koinsight
 
+    # ── Wallabag ───────────────────────────────────────────────────────────
+
+    - name: Create Wallabag directory
+      file:
+        path: /opt/wallabag
+        state: directory
+        owner: root
+        group: root
+        mode: '0750'
+      tags: wallabag
+
+    - name: Copy Wallabag docker-compose.yml
+      copy:
+        src: ../wallabag/docker-compose.yml
+        dest: /opt/wallabag/docker-compose.yml
+        owner: root
+        group: root
+        mode: '0640'
+      tags: wallabag
+
+    - name: Write Wallabag .env
+      copy:
+        dest: /opt/wallabag/.env
+        owner: root
+        group: root
+        mode: '0600'
+        content: |
+          WALLABAG_SECRET={{ wallabag_secret }}
+      no_log: true
+      tags: wallabag
+
+    - name: Pull and start Wallabag
+      command: docker compose up -d --pull always
+      args:
+        chdir: /opt/wallabag
+      tags: wallabag
+
     # ── GoatCounter ─────────────────────────────────────────────────────────
 
     - name: Create goatcounter system user
@@ -727,6 +832,7 @@
         - /opt/hermes
         - /opt/calibre
         - /opt/koinsight
+        - /opt/wallabag
       when: docker_daemon_config.changed
 
     # ── Unified log viewer ──────────────────────────────────────────────────
@@ -756,6 +862,7 @@
               "gitea":        "\033[34m",
               "calibre":      "\033[31m",
               "koinsight":    "\033[37m",
+              "wallabag":     "\033[95m",
           }
           RESET = "\033[0m"
           ANSI = re.compile(r"\x1b\[[0-9;]*m")

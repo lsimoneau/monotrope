@@ -1,0 +1,32 @@
+services:
+  wallabag:
+    image: wallabag/wallabag:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3002:80"
+    environment:
+      SYMFONY__ENV__DATABASE_DRIVER: pdo_sqlite
+      SYMFONY__ENV__DATABASE_NAME: /var/www/wallabag/data/db/wallabag
+      SYMFONY__ENV__DATABASE_USER: ""
+      SYMFONY__ENV__DATABASE_PASSWORD: ""
+      SYMFONY__ENV__DOMAIN_NAME: https://bookmarks.monotrope.au
+      SYMFONY__ENV__SERVER_NAME: "Monotrope Read-Later"
+      SYMFONY__ENV__SECRET: ${WALLABAG_SECRET}
+      SYMFONY__ENV__FOSUSER_REGISTRATION: "false"
+      SYMFONY__ENV__FOSUSER_CONFIRMATION: "false"
+      SYMFONY__ENV__TWOFACTOR_AUTH: "false"
+      SYMFONY__ENV__MAILER_DSN: "null://null"
+      SYMFONY__ENV__FROM_EMAIL: noreply@monotrope.au
+      POPULATE_DATABASE: "true"
+    volumes:
+      - data:/var/www/wallabag/data
+      - images:/var/www/wallabag/web/assets/images
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+
+volumes:
+  data:
+  images:

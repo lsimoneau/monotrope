@@ -1,4 +1,4 @@
-.PHONY: build serve deploy ssh setup infra logs miniflux gitea goatcounter hermes hermes-sync hermes-chat hermes-cli enrich wireguard calibre calibre-build calibre-sync koinsight
+.PHONY: build serve deploy ssh setup infra logs miniflux gitea goatcounter hermes hermes-sync hermes-chat hermes-cli enrich wireguard calibre calibre-build calibre-sync koinsight wallabag
 
 # Load .env if it exists
 -include .env
@@ -93,6 +93,10 @@ calibre-sync:
 koinsight:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
 	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags koinsight
+
+wallabag:
+	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
+	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags wallabag
 
 enrich:
 	uv run enrich.py
