@@ -3,8 +3,9 @@ site/public/
 site/resources/
 site/.hugo_build.lock
 
-# Claude Code
-.claude/
+# Claude Code (track commands/, ignore per-machine config)
+.claude/settings.local.json
+.claude/settings.json
 
 # Environment
 .env
