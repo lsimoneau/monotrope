@@ -220,12 +220,11 @@
         port: '443'
         proto: tcp
 
-    - name: Allow Gitea SSH only over WireGuard
+    - name: Allow Gitea SSH
       ufw:
         rule: allow
         port: '2222'
         proto: tcp
-        from_ip: 10.100.0.0/24
 
     - name: Enable UFW
       ufw:
