@@ -7,14 +7,14 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
-LIBRARY_PATH = "/library"
+LIBRARY_PATH = "/calibre-library"
 DOWNLOADS_PATH = "/downloads"
 KOBODL_CONFIG = "/home/config/kobodl.json"
 CALIBRE_CONFIG_DIR = "/config/calibre"
 
-# Ensure venv bin (kobodl) and system paths (calibredb) are both available
+# Ensure venv bin (kobodl) and the CWA-bundled calibre binaries are both on PATH
 VENV_BIN = str(Path(sys.executable).parent)
-PATH = os.pathsep.join([VENV_BIN, os.environ.get("PATH", "/usr/bin:/bin")])
+PATH = os.pathsep.join([VENV_BIN, "/app/calibre", os.environ.get("PATH", "/usr/bin:/bin")])
 
 mcp = FastMCP("calibre", host="0.0.0.0", port=8000, stateless_http=True)
 

@@ -7,13 +7,12 @@ services:
     volumes:
       - calibre_config:/config
       - kobodl_config:/home/config
-      - library:/library
+      - library:/calibre-library
       - downloads:/downloads
     environment:
       PUID: "1000"
       PGID: "1000"
       TZ: "Australia/Sydney"
-      DOCKER_MODS: "linuxserver/mods:universal-calibre"
     networks:
       - default
       - monotrope

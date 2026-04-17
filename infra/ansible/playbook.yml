@@ -616,7 +616,7 @@
     - name: Check if Calibre library exists
       command: >
         docker compose exec -T calibre-web
-        test -f /library/metadata.db
+        test -f /calibre-library/metadata.db
       args:
         chdir: /opt/calibre
       register: calibre_db_check
@@ -627,7 +627,7 @@
     - name: Initialise Calibre library
       command: >
         docker compose exec -T --user abc calibre-web
-        calibredb add --empty --with-library /library/
+        calibredb add --empty --with-library /calibre-library/
       args:
         chdir: /opt/calibre
       when: calibre_db_check.rc != 0
@@ -654,7 +654,7 @@
             export CALIBRE_CONFIG_DIRECTORY=/config/calibre
             for f in /downloads/*.epub; do
               [ -f "$f" ] || continue
-              calibredb add "$f" --with-library /library/ || true
+              calibredb add "$f" --with-library /calibre-library/ || true
             done
           '
       tags: calibre

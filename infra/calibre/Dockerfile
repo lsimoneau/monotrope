@@ -1,4 +1,4 @@
-FROM lscr.io/linuxserver/calibre-web:latest
+FROM crocodilestick/calibre-web-automated:latest
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
