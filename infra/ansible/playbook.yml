@@ -534,16 +534,37 @@
       notify: Restart Hermes
       tags: hermes
 
-    - name: Copy Hermes skills (only if missing — Hermes self-modifies skills, don't clobber)
+    # Authored skills ("seeds") live in the repo. Hermes owns its evolved copies
+    # inside the hermes_data volume; we copy seeds in no-clobber so deploys never
+    # overwrite agent-modified skills. For fresh installs this plants the seeds
+    # before first boot; for existing installs it only adds new seed files.
+    - name: Stage Hermes seed skills on host
       copy:
-        src: ../hermes/skills/
-        dest: /opt/hermes/skills/
-        owner: '10000'
-        group: '10000'
-        mode: '0640'
-        directory_mode: '0750'
-        force: no
-      notify: Restart Hermes
+        src: ../hermes/seeds/
+        dest: /opt/hermes/seeds/
+        owner: root
+        group: root
+        mode: '0644'
+        directory_mode: '0755'
+      tags: hermes
+
+    - name: Ensure hermes_data volume exists
+      command: docker volume create hermes_hermes_data
+      register: hermes_volume
+      changed_when: hermes_volume.rc == 0 and 'already exists' not in (hermes_volume.stderr | default(''))
+      failed_when: hermes_volume.rc != 0 and 'already exists' not in (hermes_volume.stderr | default(''))
+      tags: hermes
+
+    - name: Seed authored skills into hermes_data volume (no-clobber)
+      command: >
+        docker run --rm
+        -v hermes_hermes_data:/data
+        -v /opt/hermes/seeds:/seeds:ro
+        --user 10000:10000
+        alpine
+        sh -c "mkdir -p /data/skills && cp -rn /seeds/. /data/skills/"
+      register: hermes_seed
+      changed_when: false
       tags: hermes
 
     - name: Write Miniflux plugin config
