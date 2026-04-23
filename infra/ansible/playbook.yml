@@ -606,6 +606,70 @@
         chdir: /opt/hermes
       tags: hermes
 
+    # ── Hermes nightly backup ──────────────────────────────────────────────
+    # `hermes backup --quick` snapshots config + state.db + auth + cron into
+    # /opt/data/state-snapshots/<timestamp>-<label>/. State.db is where
+    # memories and sessions live, so this is the only thing that captures
+    # hermes' evolving knowledge coherently. Retain last 14 nightlies; other
+    # labels (pre-deploy, manual) are left alone.
+
+    - name: Install hermes-backup script
+      copy:
+        dest: /usr/local/bin/hermes-backup
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/bin/bash
+          set -euo pipefail
+          LABEL="nightly-$(date -u +%Y%m%d)"
+          docker exec -u hermes hermes bash -c "source /opt/hermes/.venv/bin/activate && /opt/hermes/hermes backup --quick --label \"$LABEL\""
+          docker exec -u hermes hermes bash -c "cd /opt/data/state-snapshots && ls -1d *-nightly-* 2>/dev/null | sort | head -n -14 | xargs -r rm -rf"
+      tags: hermes
+
+    - name: Install hermes-backup systemd service
+      copy:
+        dest: /etc/systemd/system/hermes-backup.service
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Nightly Hermes state snapshot
+          After=docker.service
+          Requires=docker.service
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/bin/hermes-backup
+      tags: hermes
+
+    - name: Install hermes-backup systemd timer
+      copy:
+        dest: /etc/systemd/system/hermes-backup.timer
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Nightly Hermes state snapshot
+
+          [Timer]
+          OnCalendar=*-*-* 18:00:00
+          Persistent=true
+
+          [Install]
+          WantedBy=timers.target
+      tags: hermes
+
+    - name: Enable and start hermes-backup timer
+      systemd:
+        name: hermes-backup.timer
+        enabled: true
+        state: started
+        daemon_reload: true
+      tags: hermes
+
 
     # ── Calibre (calibre-web + kobodl + MCP server) ──────────────────────
 
