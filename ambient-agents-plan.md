@@ -29,20 +29,38 @@ Not a goal: general agentic coding practice on large codebases. That's a
 legitimate gap but this project doesn't serve it well. Revisit at the
 three-month checkpoint whether to add a second track for that.
 
+## Status
+
+Pre-Week-1 state management work is done (see "Week 0" below). Next up is
+Week 1: headless Obsidian + Sync on the VPS. Safe to clear context and
+resume from there.
+
 ## Architecture decisions
 
 Made:
 
 - Hermes on the Sydney VPS, reached from laptop and phone via the messaging
   gateway and HTTP API.
-- Headless Obsidian plus Obsidian Sync running on the VPS, so hermes writes
-  via the official Obsidian CLI and gets template application and link
-  updates right.
+- Hermes stays in its own container. Obsidian will run alongside it, not
+  inside the same container. Hermes reaches the vault via direct filesystem
+  read/grep on the shared markdown tree rather than MCP (context bloat, worse
+  performance) or the Obsidian CLI (needs Electron).
+- Headless Obsidian plus Obsidian Sync running on the VPS against the
+  existing vault. Hermes writes plain markdown; Obsidian handles sync and
+  any template/link fixups as a side-effect of the vault being live.
 - Calendar access via iCal subscribe: share CA gcal to my personal Google,
   generate private iCal URL, point hermes at it. No OAuth, read-only.
 - Output convention: every skill writes a summary note to `agent-reports/`
   regardless of what else it does. The vault is the log.
 - No plugin in v1. The vault is the surface.
+- Hermes skills are seeded into a named volume on deploy (no bind-mount).
+  Repo holds seeds; server copy evolves freely without ansible clobbering
+  it. See `infra/hermes/seeds/`.
+- Hermes state is backed up two ways: nightly `hermes backup --quick`
+  snapshots (14-day retention on disk) and a 30-min git push of the
+  diff-able volume contents (skills/, cron/, SOUL.md, config.yaml) to a
+  private `louis/hermes-state` repo in gitea. Memory lives in state.db and
+  is only covered by the nightly snapshot.
 
 Deferred:
 
@@ -59,6 +77,32 @@ Out of scope permanently:
 - Mobile UX work.
 - Multi-user or team-shared version.
 - Chat interface in Obsidian. Terminal and Signal already cover that.
+
+## Week 0: State management (done)
+
+Done before touching Obsidian, because the existing hermes install had no
+backups and a bind-mount for skills that would lose server-side evolution
+on every deploy. What shipped:
+
+- Skills moved from bind-mount to a named volume, with a seed-at-deploy
+  pattern (`infra/hermes/seeds/` → `hermes_data` volume, no-clobber copy).
+  Ansible no longer overwrites agent-authored skill drift.
+- Nightly `hermes backup --quick` at 18:00 UTC via systemd timer,
+  14-day on-disk retention. Snapshots include state.db (memory + cron
+  history), config, auth, .env, cron definitions.
+- Git sidecar pushing the diff-able volume contents (skills/, cron/,
+  SOUL.md, config.yaml) to a private `louis/hermes-state` repo in gitea
+  every 30 min. No-op when nothing changed. Gitea joined the `monotrope`
+  docker network so the push is container-to-container.
+- Gitea given `container_name: gitea` so it's reachable on the bridge
+  network by name.
+
+Not done, deliberately deferred:
+
+- Offsite copy of nightly snapshots (restic/borg → B2). Single-region
+  failure is the main uncovered risk; add if/when it matters.
+- Syncing server-side skill evolution back into the repo seeds. Current
+  seeds are a good enough baseline.
 
 ## Weeks 1-4: Build sprint
 
