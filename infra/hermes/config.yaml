@@ -1,6 +1,6 @@
 model:
   provider: openrouter
-  default: google/gemma-4-26b-a4b-it
+  default: minimax/minimax-m2.7
 memory:
   memory_enabled: true
   user_profile_enabled: true

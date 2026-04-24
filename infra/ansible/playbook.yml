@@ -22,6 +22,8 @@
     hermes_email_password: "{{ lookup('env', 'HERMES_EMAIL_PASSWORD') }}"
     hermes_email_allowed_users: "{{ lookup('env', 'HERMES_EMAIL_ALLOWED_USERS') | default('simoneau.louis@gmail.com,louissimoneau@fastmail.com,noreply@kobo.com,louis@monotrope.au', true) }}"
     hermes_state_sync_token: "{{ lookup('env', 'HERMES_STATE_SYNC_TOKEN') }}"
+    hermes_browserbase_api_key: "{{ lookup('env', 'HERMES_BROWSERBASE_API_KEY') }}"
+    hermes_browserbase_project_id: "{{ lookup('env', 'HERMES_BROWSERBASE_PROJECT_ID') }}"
     obsidian_vault_name: "{{ lookup('env', 'OBSIDIAN_VAULT_NAME') }}"
     wallabag_secret: "{{ lookup('env', 'WALLABAG_SECRET') }}"
 
@@ -675,6 +677,8 @@
           EMAIL_IMAP_HOST=imap.gmail.com
           EMAIL_SMTP_HOST=smtp.gmail.com
           EMAIL_ALLOWED_USERS={{ hermes_email_allowed_users }}
+          BROWSERBASE_API_KEY={{ hermes_browserbase_api_key }}
+          BROWSERBASE_PROJECT_ID={{ hermes_browserbase_project_id }}
       no_log: true
       tags: hermes
 
