@@ -32,8 +32,9 @@ three-month checkpoint whether to add a second track for that.
 ## Status
 
 Pre-Week-1 state management work is done (see "Week 0" below). Next up is
-Week 1: headless Obsidian + Sync on the VPS. Safe to clear context and
-resume from there.
+Week 1: Obsidian Sync (headless, no Electron) on the VPS, with the vault as
+a shared docker volume that hermes reads and writes directly. Safe to clear
+context and resume from there.
 
 ## Architecture decisions
 
@@ -41,13 +42,24 @@ Made:
 
 - Hermes on the Sydney VPS, reached from laptop and phone via the messaging
   gateway and HTTP API.
-- Hermes stays in its own container. Obsidian will run alongside it, not
-  inside the same container. Hermes reaches the vault via direct filesystem
-  read/grep on the shared markdown tree rather than MCP (context bloat, worse
-  performance) or the Obsidian CLI (needs Electron).
-- Headless Obsidian plus Obsidian Sync running on the VPS against the
-  existing vault. Hermes writes plain markdown; Obsidian handles sync and
-  any template/link fixups as a side-effect of the vault being live.
+- Hermes stays in its own container. The vault lives on a shared docker
+  volume that hermes and the Obsidian Sync container both mount. Hermes
+  reads and writes plain markdown directly against the bind-mount using its
+  built-in file/grep/patch tools — no MCP (context bloat, worse performance),
+  no Obsidian CLI (needs Electron running), no SSH, no docker socket.
+- No Electron on the server. Only Obsidian's Headless Sync binary runs
+  there, in its own container, doing nothing but two-way sync with
+  Obsidian's cloud. The earlier plan to run a full headless Obsidian app
+  (xvfb + Electron + plugins) is dropped: the official CLI only drives a
+  running Electron instance, and Templater/link-fixup on-write isn't worth
+  the supervision cost. Template expansion happens next time the note is
+  opened on desktop, which is fine for agent-authored notes under
+  `agent-reports/` that I read rather than edit.
+- Accepted risk: concurrent writes. If hermes writes a note while Sync is
+  pulling an edit from my laptop, Sync produces a `.conflict` copy rather
+  than losing data. Near-zero risk for `agent-reports/` (agent-only
+  directory). Real but tolerable for any note hermes appends to that I
+  also edit by hand.
 - Calendar access via iCal subscribe: share CA gcal to my personal Google,
   generate private iCal URL, point hermes at it. No OAuth, read-only.
 - Output convention: every skill writes a summary note to `agent-reports/`
@@ -64,6 +76,9 @@ Made:
 
 Deferred:
 
+- Running a full Electron Obsidian on the server (headless via xvfb) to get
+  template expansion and link-backfill at write time. Reconsider only if
+  on-next-open expansion proves insufficient for a specific skill.
 - TypeScript Obsidian plugin. Reconsider when specific output-surface
   problems emerge that markdown notes can't solve.
 - Google Calendar OAuth. Only if iCal read-only becomes limiting.
@@ -111,17 +126,25 @@ vault, with basic observability.
 
 ### Week 1: Infrastructure
 
-- Set up headless Obsidian on the VPS. Verify it stays running.
-- Configure Obsidian Sync to run on the server against my existing vault.
-- Register and test the official Obsidian CLI. Verify: commands run on the
-  VPS produce changes that sync back to my laptop.
-- Document the setup in a README inside this directory so I can rebuild it.
+- Verify Obsidian ships Headless Sync as a usable standalone daemon
+  (packaging, supervision model, credential handling). This gates the rest
+  of the week — if it isn't a real standalone binary the shape changes
+  again.
+- Add `infra/obsidian/` with a compose service for the Sync container and
+  a named volume for the vault. Mount the same volume into hermes.
+- First-run: log Sync into the existing vault, confirm two-way sync with
+  the laptop.
+- From hermes' own sandbox, verify direct read/grep/write against the
+  mounted vault produces files that round-trip to the laptop.
+- Document the setup in a README inside `infra/obsidian/` so I can rebuild
+  it.
 
 Open questions to resolve this week:
 
-- Does headless Obsidian actually run stably on Ubuntu? How is it supervised
-  (systemd unit, Docker, something else)?
-- How are credentials managed for Obsidian Sync on the server?
+- Is Headless Sync packaged as a standalone binary, or does it still
+  require the Electron app shell?
+- How are Sync credentials provisioned into the container on first run vs.
+  subsequent runs?
 
 ### Week 2: Hermes foundation plus daily-plan skill
 

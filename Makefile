@@ -1,4 +1,4 @@
-.PHONY: build serve deploy ssh setup infra logs miniflux gitea goatcounter hermes hermes-sync hermes-chat hermes-cli enrich wireguard calibre calibre-build calibre-sync koinsight wallabag
+.PHONY: build serve deploy ssh setup infra logs miniflux gitea goatcounter hermes hermes-sync hermes-chat hermes-cli enrich wireguard calibre calibre-build calibre-sync koinsight wallabag obsidian obsidian-login
 
 # Load .env if it exists
 -include .env
@@ -40,6 +40,19 @@ gitea:
 goatcounter:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
 	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags goatcounter
+
+obsidian:
+	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
+	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags obsidian
+
+# Re-authenticate the headless Obsidian Sync client.
+# Run when sync starts logging "Failed to authenticate: Not logged in".
+# Override the email by passing EMAIL=... on the command line.
+OBSIDIAN_EMAIL ?= simoneau.louis@gmail.com
+obsidian-login:
+	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
+	ssh -t root@$(MONOTROPE_HOST) docker exec -it obsidian-sync ob login --email $(OBSIDIAN_EMAIL)
+	ssh root@$(MONOTROPE_HOST) docker restart obsidian-sync
 
 hermes: hermes-sync
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)

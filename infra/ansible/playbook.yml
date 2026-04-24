@@ -22,6 +22,7 @@
     hermes_email_password: "{{ lookup('env', 'HERMES_EMAIL_PASSWORD') }}"
     hermes_email_allowed_users: "{{ lookup('env', 'HERMES_EMAIL_ALLOWED_USERS') | default('simoneau.louis@gmail.com,louissimoneau@fastmail.com,noreply@kobo.com,louis@monotrope.au', true) }}"
     hermes_state_sync_token: "{{ lookup('env', 'HERMES_STATE_SYNC_TOKEN') }}"
+    obsidian_vault_name: "{{ lookup('env', 'OBSIDIAN_VAULT_NAME') }}"
     wallabag_secret: "{{ lookup('env', 'WALLABAG_SECRET') }}"
 
   tasks:
@@ -484,6 +485,82 @@
       args:
         chdir: /opt/gitea
       tags: gitea
+
+    # ── Obsidian Headless Sync ─────────────────────────────────────────────
+    # Runs obsidian-headless (npm: obsidian-headless) as a long-lived
+    # sync daemon against a shared docker volume. Hermes mounts the same
+    # volume read-write and reaches the vault via direct filesystem calls.
+    # No Electron on the server; template expansion happens next time the
+    # note is opened on desktop.
+    # Bootstrap (one-time):
+    #   1. Set OBSIDIAN_VAULT_NAME in the env the playbook runs with
+    #      (matches the name from `ob sync-list-remote`).
+    #   2. `make obsidian` to build and start the container.
+    #   3. `make obsidian-login` to do the interactive Obsidian Sync
+    #      login inside the container — credentials persist in the
+    #      obsidian_config volume. Re-run after a session is revoked.
+    # Must run before Hermes so the external volume exists when Hermes
+    # recreates with its new /vault mount.
+
+    - name: Create Obsidian directory
+      file:
+        path: /opt/obsidian
+        state: directory
+        owner: root
+        group: root
+        mode: '0750'
+      tags: obsidian
+
+    - name: Copy Obsidian Dockerfile
+      copy:
+        src: ../obsidian/Dockerfile
+        dest: /opt/obsidian/Dockerfile
+        owner: root
+        group: root
+        mode: '0640'
+      tags: obsidian
+
+    - name: Copy Obsidian entrypoint
+      copy:
+        src: ../obsidian/entrypoint.sh
+        dest: /opt/obsidian/entrypoint.sh
+        owner: root
+        group: root
+        mode: '0755'
+      tags: obsidian
+
+    - name: Copy Obsidian docker-compose.yml
+      copy:
+        src: ../obsidian/docker-compose.yml
+        dest: /opt/obsidian/docker-compose.yml
+        owner: root
+        group: root
+        mode: '0640'
+      tags: obsidian
+
+    - name: Write Obsidian .env
+      copy:
+        dest: /opt/obsidian/.env
+        owner: root
+        group: root
+        mode: '0600'
+        content: |
+          OBSIDIAN_VAULT_NAME={{ obsidian_vault_name }}
+      no_log: true
+      tags: obsidian
+
+    - name: Ensure obsidian_vault volume exists
+      command: docker volume create obsidian_obsidian_vault
+      register: obsidian_vault_volume
+      changed_when: obsidian_vault_volume.rc == 0 and 'already exists' not in (obsidian_vault_volume.stderr | default(''))
+      failed_when: obsidian_vault_volume.rc != 0 and 'already exists' not in (obsidian_vault_volume.stderr | default(''))
+      tags: obsidian
+
+    - name: Build and start Obsidian Sync
+      command: docker compose up -d --build
+      args:
+        chdir: /opt/obsidian
+      tags: obsidian
 
     # ── Hermes Agent ────────────────────────────────────────────────────────
 
@@ -1014,6 +1091,7 @@
       loop:
         - /opt/miniflux
         - /opt/gitea
+        - /opt/obsidian
         - /opt/hermes
         - /opt/calibre
         - /opt/koinsight

@@ -9,6 +9,7 @@ services:
     volumes:
       - hermes_data:/opt/data
       - ./plugins:/opt/data/plugins:ro
+      - obsidian_vault:/vault
     environment:
       OPENROUTER_API_KEY: "${OPENROUTER_API_KEY}"
       TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN}"
@@ -22,3 +23,6 @@ networks:
 
 volumes:
   hermes_data:
+  obsidian_vault:
+    external: true
+    name: obsidian_obsidian_vault
