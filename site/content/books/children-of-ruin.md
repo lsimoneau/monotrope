@@ -4,9 +4,10 @@ build:
   list: always
   render: never
 cover: /covers/children-of-ruin.jpg
-date: 2026-04-13
+date: 2026-04-24
 isbn: '9780316452540'
 publish: false
-status: reading
+rating: 4
+status: finished
 title: Children of Ruin
 ---
