@@ -4,28 +4,12 @@
   become: true
 
   vars:
+    # Static, deploy-machine-local config. Service-level vars and secrets
+    # come from group_vars/all/{vars,vault}.yml.
     site_dir: /var/www/monotrope
     deploy_user: deploy
     deploy_pubkey: "{{ lookup('file', lookup('env', 'HOME') + '/.ssh/id_ed25519.pub') }}"
-    miniflux_db_password: "{{ lookup('env', 'MINIFLUX_DB_PASSWORD') }}"
-    miniflux_admin_user: "{{ lookup('env', 'MINIFLUX_ADMIN_USER') | default('admin') }}"
-    miniflux_admin_password: "{{ lookup('env', 'MINIFLUX_ADMIN_PASSWORD') }}"
-    gitea_db_password: "{{ lookup('env', 'GITEA_DB_PASSWORD') }}"
     goatcounter_version: "2.7.0"
-    goatcounter_admin_email: "{{ lookup('env', 'GOATCOUNTER_ADMIN_EMAIL') }}"
-    goatcounter_admin_password: "{{ lookup('env', 'GOATCOUNTER_ADMIN_PASSWORD') }}"
-    hermes_openrouter_api_key: "{{ lookup('env', 'HERMES_OPENROUTER_API_KEY') }}"
-    hermes_telegram_bot_token: "{{ lookup('env', 'HERMES_TELEGRAM_BOT_TOKEN') }}"
-    hermes_telegram_allowed_users: "{{ lookup('env', 'HERMES_TELEGRAM_ALLOWED_USERS') }}"
-    hermes_miniflux_api_key: "{{ lookup('env', 'HERMES_MINIFLUX_API_KEY') }}"
-    wg_client_pubkey: "{{ lookup('env', 'WG_CLIENT_PUBKEY') }}"
-    hermes_email_password: "{{ lookup('env', 'HERMES_EMAIL_PASSWORD') }}"
-    hermes_email_allowed_users: "{{ lookup('env', 'HERMES_EMAIL_ALLOWED_USERS') | default('simoneau.louis@gmail.com,louissimoneau@fastmail.com,noreply@kobo.com,louis@monotrope.au', true) }}"
-    hermes_state_sync_token: "{{ lookup('env', 'HERMES_STATE_SYNC_TOKEN') }}"
-    hermes_browserbase_api_key: "{{ lookup('env', 'HERMES_BROWSERBASE_API_KEY') }}"
-    hermes_browserbase_project_id: "{{ lookup('env', 'HERMES_BROWSERBASE_PROJECT_ID') }}"
-    obsidian_vault_name: "{{ lookup('env', 'OBSIDIAN_VAULT_NAME') }}"
-    wallabag_secret: "{{ lookup('env', 'WALLABAG_SECRET') }}"
 
   tasks:
 

@@ -1,0 +1,30 @@
+---
+# Non-secret config and indirection to vault.yml.
+# Secrets live encrypted in the sibling vault.yml; values referenced here
+# as {{ vault_* }} are decrypted at deploy time.
+
+# ── Deploy target (non-secret) ─────────────────────────────────────────
+# Read by Makefile and deploy.sh to construct the inline inventory.
+monotrope_host: 209.38.30.139
+wg_client_pubkey: v+3fFaRIoT20tl2ZOzhI8zEn2jHmYLRVBuozrFt+8Gc=
+
+# ── Non-secret service config ──────────────────────────────────────────
+obsidian_vault_name: Vault
+hermes_email_allowed_users: simoneau.louis@gmail.com,louissimoneau@fastmail.com,noreply@kobo.com,louis@monotrope.au
+
+# ── Indirection: secrets resolved from vault.yml ───────────────────────
+miniflux_db_password: "{{ vault_miniflux_db_password }}"
+miniflux_admin_user: "{{ vault_miniflux_admin_user }}"
+miniflux_admin_password: "{{ vault_miniflux_admin_password }}"
+gitea_db_password: "{{ vault_gitea_db_password }}"
+goatcounter_admin_email: "{{ vault_goatcounter_admin_email }}"
+goatcounter_admin_password: "{{ vault_goatcounter_admin_password }}"
+hermes_openrouter_api_key: "{{ vault_hermes_openrouter_api_key }}"
+hermes_telegram_bot_token: "{{ vault_hermes_telegram_bot_token }}"
+hermes_telegram_allowed_users: "{{ vault_hermes_telegram_allowed_users }}"
+hermes_miniflux_api_key: "{{ vault_hermes_miniflux_api_key }}"
+hermes_email_password: "{{ vault_hermes_email_password }}"
+hermes_state_sync_token: "{{ vault_hermes_state_sync_token }}"
+hermes_browserbase_api_key: "{{ vault_hermes_browserbase_api_key }}"
+hermes_browserbase_project_id: "{{ vault_hermes_browserbase_project_id }}"
+wallabag_secret: "{{ vault_wallabag_secret }}"

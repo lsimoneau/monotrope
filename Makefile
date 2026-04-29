@@ -1,11 +1,15 @@
 .PHONY: build serve deploy ssh setup infra logs miniflux gitea goatcounter hermes hermes-sync hermes-chat hermes-cli enrich wireguard calibre calibre-build calibre-sync koinsight wallabag obsidian obsidian-login
 
-# Load .env if it exists
--include .env
-export
-
 DEPLOY_USER := deploy
-MONOTROPE_HOST ?=
+
+# Read the host from group_vars (single source of truth, alongside the other
+# non-secret deploy config). The same file is loaded by Ansible at runtime.
+MONOTROPE_HOST := $(shell awk -F': *' '/^monotrope_host:/ {gsub(/[" ]/, "", $$2); print $$2}' infra/ansible/group_vars/all/vars.yml)
+
+# ansible-playbook picks this up automatically; covers all targets below.
+ANSIBLE_VAULT_PASSWORD_FILE := .vault_pass
+
+export MONOTROPE_HOST DEPLOY_USER ANSIBLE_VAULT_PASSWORD_FILE
 
 build:
 	cd site && hugo --minify

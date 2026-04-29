@@ -10,6 +10,9 @@ site/.hugo_build.lock
 # Environment
 .env
 
+# Ansible Vault password (each operator writes their own)
+.vault_pass
+
 # OS
 .DS_Store
 Thumbs.db
