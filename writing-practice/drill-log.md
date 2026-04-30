@@ -2,6 +2,33 @@
 
 Append-only session journal. Most recent at top.
 
+## 2026-04-30 — Children of Ruin review, Read → Drill (across multiple passes)
+
+Short blurb (~150 words). Started as hedge-piled apology for a 4/5; ended as a committed positive review with a thesis (Tchaikovsky's alien-creation trick: real Earth biology + society and language).
+
+**Diagnosed:**
+- Hedge-stacking (7 hedges in 4 sentences in v1)
+- Stall at commit point — "genuinely fascinating" closing the door on the octopus claim
+- Apologetic frame ("rated it a bit lower mostly because…") leading the piece
+- Throat-clearing transition mid-piece ("But putting that aside") in v3 closer
+- "Still" used as repeated concession marker after the comparison was already established
+- Doubled-hedge constructions ("some occasional", "I've read" + "I can't think of" + "felt")
+- Closer rhythm — long noun phrase then small litotes verb (~v5 closer); reader holds 26-word subject before reaching the predicate, which then lands soft
+
+**What shifted:**
+- Opener flipped from rating-justification to "I had an absolute blast" with the comparison as concession
+- Octopus paragraph committed: "most alien minds in sci-fi" + "neurology that actually exists on Earth"
+- Closer reworked three times — final version compresses the thesis into a 9-word imperative in quotes ("pick weird Earth animals and give them society and language"), with a load-bearing "still" doing temporal/persistence work instead of concession-marking
+- "Picking weird Earth animals and giving them society and language" — named the mechanical trick directly, same family as "neurology that exists on Earth"
+
+**Worked:** constraint to name what's specific about the praise, not just rate it. When pushed to commit, Louis went hard each pass. Final closer revision came after Louis flagged the rhythm himself.
+
+**Notable:** Louis distinguished between concession-"still" and load-bearing-"still" by ear before naming it. The retained "still" in the closer was load-bearing.
+
+**Lesson:** trust the ear on rhythm. If something feels too long, wordy, or lacks punch, try different versions. The v5 closer was technically correct but rhythmically off; Louis felt it before he could name it, and the v6 rewrite (compressed thesis into imperative-in-quotes) only happened because he didn't settle for "I can live with it".
+
+---
+
 ## 2026-04-17 — Alienation draft, Read → Drill → Page-one → Drill
 
 Substantial session across the whole post.

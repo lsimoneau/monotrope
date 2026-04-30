@@ -3,6 +3,7 @@
 Active patterns. Flag these aggressively in diagnoses.
 
 - **Hedge-stacking.** "I think", "really", "incredibly", "super", "genuinely", "in many contexts", "kind of", "sort of" piling up. Each hedge is a small apology for saying the thing.
+- **Repeated concession markers after the comparison is already set up.** "Still", "if anything even more X", and similar after a comparative frame has been established (e.g. "doesn't quite live up to X, but..."). The first concession does the work. Repeats are apology. Distinct from load-bearing "still" doing temporal/persistence work — there, "still" is making a claim, not softening one.
 - **Pedagogical switch when introducing concepts.** The writing goes textbook when Louis explains a framework (Marx's four alienations, a technical concept, an argument someone else has made). Reads like a Wikipedia paragraph dropped into a personal essay. The target isn't "no exposition". Voiced, specific exposition is fine. The problem is textbook register and re-labelling the scene.
 - **Re-labelling the scene.** When exposition lists the categories a framework supplies instead of using the framework to make a claim. If the scene already made the reader feel it, don't name the parts back at them.
 - **Pre-emptive defensiveness.** Disclaimers before anyone has attacked. "A disclaimer: I don't think my views are ideologically consistent." "This might be wrong but..." Defending positions nobody has challenged yet.
