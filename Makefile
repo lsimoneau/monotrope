@@ -1,4 +1,4 @@
-.PHONY: build serve deploy ssh setup infra logs miniflux gitea goatcounter hermes hermes-sync hermes-chat hermes-cli enrich wireguard calibre calibre-build calibre-sync koinsight wallabag obsidian obsidian-login
+.PHONY: build serve deploy ssh setup infra logs miniflux gitea goatcounter hermes hermes-sync hermes-chat hermes-cli enrich wireguard calibre calibre-build calibre-sync koinsight wallabag obsidian obsidian-login backup-setup backup
 
 DEPLOY_USER := deploy
 
@@ -117,3 +117,11 @@ wallabag:
 
 enrich:
 	uv run enrich.py
+
+backup-setup:
+	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
+	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags backup
+
+backup:
+	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
+	ssh root@$(MONOTROPE_HOST) /usr/local/bin/monotrope-backup $(LABEL)

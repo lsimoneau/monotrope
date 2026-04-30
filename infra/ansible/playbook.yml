@@ -1192,6 +1192,40 @@
               main()
           {% endraw %}
 
+    # ── Backups (restic to Wasabi) ───────────────────────────────────────────
+    # One-shot snapshot for the VPS-to-homelab migration. The same script and
+    # env file pattern will be reused on the home server with a different
+    # RESTIC_REPOSITORY (NAS over LAN) and a systemd timer for nightly runs.
+
+    - name: Install restic
+      apt:
+        name: restic
+        state: present
+      tags: backup
+
+    - name: Stage backup script
+      copy:
+        src: ../backup/monotrope-backup
+        dest: /usr/local/bin/monotrope-backup
+        owner: root
+        group: root
+        mode: '0755'
+      tags: backup
+
+    - name: Stage backup environment file
+      copy:
+        dest: /etc/monotrope-backup.env
+        owner: root
+        group: root
+        mode: '0600'
+        content: |
+          RESTIC_REPOSITORY=s3:s3.ap-southeast-2.wasabisys.com/monotrope-backup
+          RESTIC_PASSWORD={{ restic_password }}
+          AWS_ACCESS_KEY_ID={{ backup_wasabi_access_key_id }}
+          AWS_SECRET_ACCESS_KEY={{ backup_wasabi_secret_access_key }}
+      no_log: true
+      tags: backup
+
     # ── Deploy user ──────────────────────────────────────────────────────────
 
     - name: Create deploy user

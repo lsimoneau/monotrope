@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# monotrope-backup — snapshot all stateful services into a restic repo.
+#
+# Reads RESTIC_REPOSITORY, RESTIC_PASSWORD, AWS_ACCESS_KEY_ID,
+# AWS_SECRET_ACCESS_KEY from /etc/monotrope-backup.env. First invocation
+# initialises the repo; subsequent invocations are incremental.
+#
+# Postgres is dumped via pg_dump and streamed to restic. Everything else is
+# read straight off the host filesystem (Docker volumes live under
+# /var/lib/docker/volumes/<name>/_data). SQLite databases are copied hot —
+# fine for one-off migration snapshots; revisit with `sqlite3 .backup` if
+# this becomes a recurring nightly run on a busy box.
+
+set -euo pipefail
+
+source /etc/monotrope-backup.env
+export RESTIC_REPOSITORY RESTIC_PASSWORD AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+
+LABEL="${1:-snapshot-$(date -u +%Y%m%d-%H%M%S)}"
+
+if ! restic snapshots >/dev/null 2>&1; then
+  echo "==> initialising restic repo at $RESTIC_REPOSITORY"
+  restic init
+fi
+
+echo "==> postgres dumps"
+docker compose -f /opt/miniflux/docker-compose.yml exec -T db \
+  pg_dump -U miniflux -Fc miniflux \
+  | restic backup --stdin --stdin-filename miniflux.pgdump \
+      --tag postgres --tag "$LABEL"
+
+docker compose -f /opt/gitea/docker-compose.yml exec -T db \
+  pg_dump -U gitea -Fc gitea \
+  | restic backup --stdin --stdin-filename gitea.pgdump \
+      --tag postgres --tag "$LABEL"
+
+echo "==> docker volumes"
+restic backup --tag volumes --tag "$LABEL" \
+  /var/lib/docker/volumes/hermes_hermes_data/_data \
+  /var/lib/docker/volumes/obsidian_obsidian_vault/_data \
+  /var/lib/docker/volumes/obsidian_obsidian_config/_data \
+  /var/lib/docker/volumes/gitea_gitea_data/_data \
+  /var/lib/docker/volumes/calibre_library/_data \
+  /var/lib/docker/volumes/calibre_books/_data \
+  /var/lib/docker/volumes/calibre_kobodl_config/_data \
+  /var/lib/docker/volumes/calibre_calibre_config/_data \
+  /var/lib/docker/volumes/wallabag_data/_data \
+  /var/lib/docker/volumes/koinsight_data/_data
+
+echo "==> system paths"
+restic backup --tag system --tag "$LABEL" \
+  /var/lib/caddy \
+  /var/lib/goatcounter \
+  /etc/ssh \
+  /etc/wireguard
+
+echo "==> snapshots tagged $LABEL"
+restic snapshots --tag "$LABEL"
