@@ -1,0 +1,19 @@
+---
+# Home (OptiPlex Proxmox) playbook. Roles get added as services come online.
+
+- name: Provision Proxmox host
+  hosts: proxmox_hosts
+  become: true
+  tasks: []
+
+- name: Provision LXCs (common)
+  hosts: lxcs
+  become: true
+  roles:
+    - tailscale
+
+- name: Provision Jellyfin LXC
+  hosts: jellyfin
+  become: true
+  roles:
+    - jellyfin

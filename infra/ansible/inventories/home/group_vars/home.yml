@@ -1,0 +1,3 @@
+---
+# Cross-home vars (apply to both the Proxmox host and any LXC).
+# Per-target vars go in proxmox_hosts.yml or lxcs.yml.

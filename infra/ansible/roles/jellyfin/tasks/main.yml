@@ -1,0 +1,38 @@
+---
+# Install Jellyfin natively from the official Debian repo and enable
+# the systemd service. Configuration (libraries, users) is done via the
+# Jellyfin web UI on first run.
+
+- name: Install dependencies for Jellyfin apt repo
+  apt:
+    name:
+      - curl
+      - gnupg
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Add Jellyfin apt keyring
+  ansible.builtin.shell: |
+    curl -fsSL https://repo.jellyfin.org/jellyfin_team.gpg.key \
+      | gpg --dearmor -o /usr/share/keyrings/jellyfin-archive-keyring.gpg
+  args:
+    creates: /usr/share/keyrings/jellyfin-archive-keyring.gpg
+
+- name: Add Jellyfin apt repo
+  copy:
+    dest: /etc/apt/sources.list.d/jellyfin.list
+    content: "deb [signed-by=/usr/share/keyrings/jellyfin-archive-keyring.gpg] https://repo.jellyfin.org/debian {{ ansible_distribution_release }} main\n"
+    mode: '0644'
+
+- name: Install Jellyfin
+  apt:
+    name: jellyfin
+    state: present
+    update_cache: true
+
+- name: Enable and start Jellyfin service
+  systemd:
+    name: jellyfin
+    enabled: true
+    state: started
