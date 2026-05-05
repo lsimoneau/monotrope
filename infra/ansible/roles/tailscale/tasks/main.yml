@@ -2,8 +2,9 @@
 # Install Tailscale and authenticate to the tailnet.
 #
 # Required vars:
-#   tailscale_auth_key — reusable + ephemeral key from
+#   tailscale_auth_key — reusable key from
 #     https://login.tailscale.com/admin/settings/keys
+#     resolved via group_vars/all/vars.yml → vault_tailscale_auth_key in vault.yml
 
 - name: Install dependencies for Tailscale apt repo
   apt:
