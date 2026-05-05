@@ -31,6 +31,49 @@
     state: present
     update_cache: true
 
+# Align the jellyfin user's UID/GID with the NAS-reading identity so the LXC's
+# nas_idmap (1028 → 1028) lets it read /media directly. Idempotent — only acts
+# when current values differ.
+- name: Get current jellyfin UID
+  ansible.builtin.command: id -u jellyfin
+  register: jellyfin_current_uid
+  changed_when: false
+
+- name: Get current jellyfin GID
+  ansible.builtin.command: id -g jellyfin
+  register: jellyfin_current_gid
+  changed_when: false
+
+- name: Align jellyfin UID/GID with {{ jellyfin_service_uid }}
+  when: >-
+    jellyfin_current_uid.stdout | int != jellyfin_service_uid
+    or jellyfin_current_gid.stdout | int != jellyfin_service_uid
+  block:
+    - name: Stop jellyfin to release files before UID change
+      ansible.builtin.systemd:
+        name: jellyfin
+        state: stopped
+
+    - name: Set jellyfin group GID
+      ansible.builtin.command: "groupmod -g {{ jellyfin_service_uid }} jellyfin"
+      when: jellyfin_current_gid.stdout | int != jellyfin_service_uid
+
+    - name: Set jellyfin user UID
+      ansible.builtin.command: "usermod -u {{ jellyfin_service_uid }} jellyfin"
+      when: jellyfin_current_uid.stdout | int != jellyfin_service_uid
+
+    - name: Reown jellyfin runtime directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        owner: jellyfin
+        group: jellyfin
+        recurse: true
+      loop:
+        - /var/lib/jellyfin
+        - /var/cache/jellyfin
+        - /var/log/jellyfin
+        - /etc/jellyfin
+
 - name: Enable and start Jellyfin service
   systemd:
     name: jellyfin

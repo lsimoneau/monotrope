@@ -1,0 +1,5 @@
+---
+# UID/GID for the jellyfin system user. Defaults to 1028 to match the
+# `homelab` user on the NAS (see reference_homelab_network) so the LXC's
+# nas_idmap feature lets jellyfin read /media directly over NFS.
+jellyfin_service_uid: 1028
