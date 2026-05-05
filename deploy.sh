@@ -9,17 +9,17 @@ MONOTROPE_HOST="${MONOTROPE_HOST:-}"
 DEPLOY_USER="deploy"
 REMOTE_DIR="/var/www/monotrope"
 
-# Fall back to reading the host from group_vars when invoked directly
-# (without `make`, which would already have exported it).
+# Fall back to reading the host from the VPS inventory when invoked
+# directly (without `make`, which would already have exported it).
 if [[ -z "$MONOTROPE_HOST" ]]; then
-  VARS_FILE="$SCRIPT_DIR/infra/ansible/group_vars/all/vars.yml"
-  if [[ -f "$VARS_FILE" ]]; then
-    MONOTROPE_HOST=$(awk -F': *' '/^monotrope_host:/ {gsub(/[" ]/, "", $2); print $2}' "$VARS_FILE")
+  INVENTORY_FILE="$SCRIPT_DIR/infra/ansible/inventories/vps/hosts.yml"
+  if [[ -f "$INVENTORY_FILE" ]]; then
+    MONOTROPE_HOST=$(awk -F': *' '/ansible_host:/ {gsub(/[" ]/, "", $2); print $2}' "$INVENTORY_FILE")
   fi
 fi
 
 if [[ -z "$MONOTROPE_HOST" ]]; then
-  echo "Error: MONOTROPE_HOST is not set and could not be read from group_vars."
+  echo "Error: MONOTROPE_HOST is not set and could not be read from the inventory."
   exit 1
 fi
 

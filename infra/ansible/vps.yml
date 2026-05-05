@@ -1,6 +1,6 @@
 ---
 - name: Provision monotrope.au server
-  hosts: all
+  hosts: vps
   become: true
 
   vars:

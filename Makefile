@@ -2,9 +2,10 @@
 
 DEPLOY_USER := deploy
 
-# Read the host from group_vars (single source of truth, alongside the other
-# non-secret deploy config). The same file is loaded by Ansible at runtime.
-MONOTROPE_HOST := $(shell awk -F': *' '/^monotrope_host:/ {gsub(/[" ]/, "", $$2); print $$2}' infra/ansible/group_vars/all/vars.yml)
+# Read the VPS host from its inventory (single source of truth — Ansible
+# uses the same file at runtime via -i below).
+VPS_INVENTORY := infra/ansible/inventories/vps/hosts.yml
+MONOTROPE_HOST := $(shell awk -F': *' '/ansible_host:/ {gsub(/[" ]/, "", $$2); print $$2}' $(VPS_INVENTORY))
 
 # ansible-playbook picks this up automatically; covers all targets below.
 ANSIBLE_VAULT_PASSWORD_FILE := .vault_pass
@@ -27,7 +28,7 @@ ssh:
 
 setup infra:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml
+	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml
 
 logs:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
@@ -35,19 +36,19 @@ logs:
 
 miniflux:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags miniflux
+	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags miniflux
 
 gitea:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags gitea
+	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags gitea
 
 goatcounter:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags goatcounter
+	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags goatcounter
 
 obsidian:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags obsidian
+	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags obsidian
 
 # Re-authenticate the headless Obsidian Sync client.
 # Run when sync starts logging "Failed to authenticate: Not logged in".
@@ -60,7 +61,7 @@ obsidian-login:
 
 hermes: hermes-sync
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags hermes
+	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags hermes
 
 hermes-sync:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
@@ -93,7 +94,7 @@ hermes-cli:
 
 wireguard:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags wireguard
+	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags wireguard
 
 calibre-build:
 	docker build -t git.monotrope.au/louis/calibre-web:latest infra/calibre/
@@ -101,7 +102,7 @@ calibre-build:
 
 calibre: calibre-build
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags calibre
+	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags calibre
 
 calibre-sync:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
@@ -109,18 +110,18 @@ calibre-sync:
 
 koinsight:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags koinsight
+	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags koinsight
 
 wallabag:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags wallabag
+	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags wallabag
 
 enrich:
 	uv run enrich.py
 
 backup-setup:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ansible-playbook -i "$(MONOTROPE_HOST)," -u root infra/ansible/playbook.yml --tags backup
+	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags backup
 
 backup:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)

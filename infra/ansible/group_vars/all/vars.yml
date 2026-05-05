@@ -1,12 +1,10 @@
 ---
-# Non-secret config and indirection to vault.yml.
+# Cross-environment non-secret config and indirection to vault.yml.
 # Secrets live encrypted in the sibling vault.yml; values referenced here
 # as {{ vault_* }} are decrypted at deploy time.
-
-# ── Deploy target (non-secret) ─────────────────────────────────────────
-# Read by Makefile and deploy.sh to construct the inline inventory.
-monotrope_host: 209.38.30.139
-wg_client_pubkey: v+3fFaRIoT20tl2ZOzhI8zEn2jHmYLRVBuozrFt+8Gc=
+#
+# Host-specific vars (e.g. monotrope_host, wg_client_pubkey) live in the
+# matching inventory's group_vars/, not here.
 
 # ── Non-secret service config ──────────────────────────────────────────
 obsidian_vault_name: Vault
