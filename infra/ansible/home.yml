@@ -4,7 +4,8 @@
 - name: Provision Proxmox host
   hosts: proxmox_hosts
   become: true
-  tasks: []
+  roles:
+    - proxmox_lxc_config
 
 - name: Provision LXCs (common)
   hosts: lxcs

@@ -1,0 +1,108 @@
+---
+# Apply host-side LXC config (/etc/pve/lxc/<vmid>.conf) for each LXC in
+# inventory whose `proxmox_host` matches this Proxmox host.
+#
+# Each LXC declares a `lxc_features` list. Supported features:
+#   - tun:        passthrough /dev/net/tun (required for Tailscale, WireGuard)
+#   - nas_idmap:  map container UID/GID 1028 to host UID/GID 1028 (NAS user)
+#                 so an unprivileged LXC can read NFS shares owned by 1028:1028
+#                 without world-permissions hacks.
+#
+# We use `lineinfile` per directive (not `blockinfile`) because Proxmox owns
+# the LXC conf format — `pct set` and similar normalize the file, URL-encoding
+# arbitrary comments and stripping content between unrecognized markers. Raw
+# `lxc.*` directives, however, are preserved verbatim, so individual lines
+# survive Proxmox's rewrites.
+#
+# Each `lxc.*` directive line is globally unique by content, so lineinfile's
+# default exact-match behaviour is sufficient for idempotency.
+#
+# Changes only take effect after an LXC restart, so this role reboots only
+# the LXCs whose host-side config actually changed.
+
+- name: Build per-LXC list for this Proxmox host
+  ansible.builtin.set_fact:
+    proxmox_lxc_apply: >-
+      {{
+        groups['lxcs']
+        | map('extract', hostvars)
+        | selectattr('proxmox_host', 'defined')
+        | selectattr('proxmox_host', 'equalto', inventory_hostname)
+        | list
+      }}
+
+- name: Apply TUN device passthrough lines
+  ansible.builtin.lineinfile:
+    path: "/etc/pve/lxc/{{ item.0.vmid }}.conf"
+    line: "{{ item.1 }}"
+    state: present
+  loop: >-
+    {{
+      proxmox_lxc_apply
+      | product([
+          'lxc.cgroup2.devices.allow: c 10:200 rwm',
+          'lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file',
+        ])
+      | list
+    }}
+  loop_control:
+    label: "vmid={{ item.0.vmid }} line={{ item.1 }}"
+  when: "'tun' in (item.0.lxc_features | default([]))"
+  register: tun_results
+
+- name: Apply NAS UID idmap lines
+  ansible.builtin.lineinfile:
+    path: "/etc/pve/lxc/{{ item.0.vmid }}.conf"
+    line: "{{ item.1 }}"
+    state: present
+  loop: >-
+    {{
+      proxmox_lxc_apply
+      | product([
+          'lxc.idmap: u 0 100000 1028',
+          'lxc.idmap: g 0 100000 1028',
+          'lxc.idmap: u 1028 1028 1',
+          'lxc.idmap: g 1028 1028 1',
+          'lxc.idmap: u 1029 101029 64507',
+          'lxc.idmap: g 1029 101029 64507',
+        ])
+      | list
+    }}
+  loop_control:
+    label: "vmid={{ item.0.vmid }} line={{ item.1 }}"
+  when: "'nas_idmap' in (item.0.lxc_features | default([]))"
+  register: idmap_results
+
+- name: Ensure root subuid/subgid mapping for NAS UID 1028
+  ansible.builtin.lineinfile:
+    path: "{{ item }}"
+    line: "root:1028:1"
+    state: present
+  loop:
+    - /etc/subuid
+    - /etc/subgid
+  when: >-
+    proxmox_lxc_apply
+    | rejectattr('lxc_features', 'undefined')
+    | map(attribute='lxc_features')
+    | flatten
+    | select('equalto', 'nas_idmap')
+    | list | length > 0
+
+- name: Collect VMIDs whose host-side config changed
+  ansible.builtin.set_fact:
+    changed_lxc_vmids: >-
+      {{
+        ((tun_results.results | default([])) + (idmap_results.results | default([])))
+        | selectattr('changed', 'equalto', true)
+        | map(attribute='item')
+        | map('first')
+        | map(attribute='vmid')
+        | unique
+        | list
+      }}
+
+- name: Restart LXCs whose host-side config changed
+  ansible.builtin.command: "pct reboot {{ item }}"
+  loop: "{{ changed_lxc_vmids }}"
+  changed_when: true
