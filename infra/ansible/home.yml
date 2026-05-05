@@ -6,6 +6,7 @@
   become: true
   roles:
     - proxmox_lxc_config
+    - caddy
 
 - name: Provision LXCs (common)
   hosts: lxcs

@@ -1,0 +1,30 @@
+{
+  email {{ caddy_email }}
+}
+
+{{ caddy_wildcard_host }} {
+  bind {{ caddy_bind_address }}
+  tls {
+    dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+  }
+{% for site in caddy_sites %}
+{% set matcher = site.name | default(site.host.split('.')[0]) %}
+
+  @{{ matcher }} host {{ site.host }}
+  handle @{{ matcher }} {
+{% if site.insecure_skip_verify | default(false) %}
+    reverse_proxy {{ site.upstream }} {
+      transport http {
+        tls_insecure_skip_verify
+      }
+    }
+{% else %}
+    reverse_proxy {{ site.upstream }}
+{% endif %}
+  }
+{% endfor %}
+
+  handle {
+    respond "no service mapped for {host}" 404
+  }
+}

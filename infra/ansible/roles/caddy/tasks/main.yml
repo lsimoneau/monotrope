@@ -1,0 +1,68 @@
+---
+- name: Ensure caddy system user exists
+  ansible.builtin.user:
+    name: caddy
+    system: true
+    home: /var/lib/caddy
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: Ensure caddy directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: caddy
+    group: caddy
+    mode: "0755"
+  loop:
+    - /etc/caddy
+    - /var/lib/caddy
+    - /var/log/caddy
+
+- name: Stat /usr/local/bin/caddy
+  ansible.builtin.stat:
+    path: /usr/local/bin/caddy
+  register: caddy_bin
+
+- name: Download Caddy custom build with plugins
+  ansible.builtin.get_url:
+    url: "https://caddyserver.com/api/download?os=linux&arch=amd64{% for p in caddy_plugins %}&p={{ p | urlencode }}{% endfor %}"
+    dest: /usr/local/bin/caddy
+    mode: "0755"
+  when: not caddy_bin.stat.exists
+  notify: Restart caddy
+
+- name: Render caddy environment file
+  ansible.builtin.template:
+    src: caddy.env.j2
+    dest: /etc/caddy/caddy.env
+    owner: caddy
+    group: caddy
+    mode: "0600"
+  notify: Restart caddy
+  no_log: true
+
+- name: Render Caddyfile
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: /etc/caddy/Caddyfile
+    owner: caddy
+    group: caddy
+    mode: "0644"
+  notify: Reload caddy
+
+- name: Install caddy systemd unit
+  ansible.builtin.copy:
+    src: caddy.service
+    dest: /etc/systemd/system/caddy.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart caddy
+
+- name: Enable and start caddy
+  ansible.builtin.systemd:
+    name: caddy
+    enabled: true
+    state: started
+    daemon_reload: true

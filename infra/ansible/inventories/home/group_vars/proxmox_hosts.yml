@@ -1,0 +1,14 @@
+---
+# Vars applied to the Proxmox host (currently just `pve`).
+
+caddy_email: louis@monotrope.au
+caddy_bind_address: 100.88.127.39  # tailscale0 on pve
+caddy_wildcard_host: "*.monotrope.au"
+caddy_plugins:
+  - github.com/caddy-dns/cloudflare
+caddy_environment:
+  CLOUDFLARE_API_TOKEN: "{{ cloudflare_dns_api_token }}"
+
+caddy_sites:
+  - host: jellyfin.monotrope.au
+    upstream: 192.168.0.99:8096

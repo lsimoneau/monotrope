@@ -1,0 +1,19 @@
+---
+# Caddy install + config for the home Proxmox host.
+#
+# Default config produces a custom Caddy build (with the listed plugins baked
+# in via caddyserver.com's download API), binds to a single interface, and
+# uses one wildcard site block with @host matchers per service.
+
+caddy_plugins: []
+caddy_email: ""
+caddy_bind_address: ""
+caddy_wildcard_host: ""
+caddy_environment: {}
+
+# List of service mappings rendered into the wildcard site block. Each entry:
+#   host: full FQDN (must match wildcard, e.g. jellyfin.monotrope.au)
+#   upstream: target URL Caddy reverse-proxies to (e.g. 192.168.0.99:8096
+#             or https://192.168.0.59:8006)
+#   insecure_skip_verify: true if upstream uses a self-signed cert
+caddy_sites: []
