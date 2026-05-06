@@ -79,3 +79,44 @@
     name: jellyfin
     enabled: true
     state: started
+
+# iGPU passthrough: align the container's render group GID with the host's
+# so the bind-mounted /dev/dri/renderD128 (passed through via the
+# proxmox_lxc_config `igpu` idmap) keeps its group ownership inside the
+# container, and add jellyfin to render+video. The video group is GID 44 on
+# both Debian default and the host, so usually a no-op.
+- name: Align render group GID with host
+  when: jellyfin_igpu
+  block:
+    - name: Get current render group GID
+      ansible.builtin.command: getent group render
+      register: render_group
+      changed_when: false
+      failed_when: render_group.rc not in [0, 2]
+
+    - name: Ensure render group exists with host-matching GID
+      when: render_group.rc != 0 or (render_group.stdout.split(':')[2] | int) != lxc_igpu_render_gid
+      block:
+        - name: Stop jellyfin to release group memberships before GID change
+          ansible.builtin.systemd:
+            name: jellyfin
+            state: stopped
+
+        - name: Set render group GID
+          ansible.builtin.group:
+            name: render
+            gid: "{{ lxc_igpu_render_gid }}"
+            state: present
+
+    - name: Ensure jellyfin is a member of video and render
+      ansible.builtin.user:
+        name: jellyfin
+        groups:
+          - video
+          - render
+        append: true
+
+    - name: Ensure jellyfin is running after iGPU group adjustments
+      ansible.builtin.systemd:
+        name: jellyfin
+        state: started

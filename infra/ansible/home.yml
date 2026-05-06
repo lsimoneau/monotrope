@@ -18,4 +18,5 @@
   hosts: jellyfin
   become: true
   roles:
-    - jellyfin
+    - role: jellyfin
+      jellyfin_igpu: "{{ 'igpu' in (lxc_features | default([])) }}"

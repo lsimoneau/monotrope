@@ -1,0 +1,73 @@
+{#-
+  Render a Proxmox LXC config file (/etc/pve/lxc/<vmid>.conf).
+
+  Inputs (set via task `vars`):
+    current_content  current file contents (string)
+    lxc_features     list of feature names from proxmox_lxc_feature_specs
+
+  We strip every existing `lxc.*` raw directive line from current_content and
+  replace it with the union of all directives contributed by the listed
+  features. Proxmox preserves raw `lxc.*` lines verbatim when it normalises
+  this file (URL-encoding comments, stripping unrecognised markers), so
+  managing the entire `lxc.*` block as one rendered region survives later
+  `pct set` calls without needing comment markers.
+
+  Whitespace handling: we accumulate every output line into a namespace list
+  and emit them with a single `join('\n')` at the bottom. This sidesteps
+  Jinja trim-block pitfalls (loops eating or doubling newlines) — every
+  appended entry produces exactly one line of output. Namespaces are also
+  required because plain `{% set %}` inside a `{% for %}` loop doesn't
+  propagate out to the enclosing scope in Jinja2.
+-#}
+{%- set ns = namespace(
+      lines=[],
+      cgroup=[],
+      mount=[],
+      uids=[],
+      gids=[]
+    ) -%}
+{%- for line in current_content.splitlines() -%}
+{%-   if not line.startswith('lxc.') -%}
+{%-     set ns.lines = ns.lines + [line] -%}
+{%-   endif -%}
+{%- endfor -%}
+{%- for feature in lxc_features -%}
+{%-   set spec = proxmox_lxc_feature_specs[feature] -%}
+{%-   set ns.cgroup = ns.cgroup + (spec.cgroup_devices | default([])) -%}
+{%-   set ns.mount  = ns.mount  + (spec.mount_entries  | default([])) -%}
+{%-   for u in spec.passthrough_uids | default([]) -%}
+{%-     set ns.uids = ns.uids + [u | int] -%}
+{%-   endfor -%}
+{%-   for g in spec.passthrough_gids | default([]) -%}
+{%-     set ns.gids = ns.gids + [g | int] -%}
+{%-   endfor -%}
+{%- endfor -%}
+{%- for d in ns.cgroup -%}
+{%-   set ns.lines = ns.lines + ['lxc.cgroup2.devices.allow: ' ~ d] -%}
+{%- endfor -%}
+{%- for m in ns.mount -%}
+{%-   set ns.lines = ns.lines + ['lxc.mount.entry: ' ~ m] -%}
+{%- endfor -%}
+{#- Idmap segments: contiguous runs map cont N..N+k-1 → host 100000+N..,
+    each passthrough id maps cont id → host id (1:1). -#}
+{%- macro idmap_segs(prefix, ids) -%}
+{%-   set m = namespace(prev=0, segs=[]) -%}
+{%-   for id in ids | unique | map('int') | sort -%}
+{%-     if id > m.prev -%}
+{%-       set m.segs = m.segs + ['lxc.idmap: ' ~ prefix ~ ' ' ~ m.prev ~ ' ' ~ (100000 + m.prev) ~ ' ' ~ (id - m.prev)] -%}
+{%-     endif -%}
+{%-     set m.segs = m.segs + ['lxc.idmap: ' ~ prefix ~ ' ' ~ id ~ ' ' ~ id ~ ' 1'] -%}
+{%-     set m.prev = id + 1 -%}
+{%-   endfor -%}
+{%-   if m.prev < 65536 -%}
+{%-     set m.segs = m.segs + ['lxc.idmap: ' ~ prefix ~ ' ' ~ m.prev ~ ' ' ~ (100000 + m.prev) ~ ' ' ~ (65536 - m.prev)] -%}
+{%-   endif -%}
+{{ m.segs | join('\n') }}
+{%- endmacro -%}
+{%- if ns.uids -%}
+{%-   set ns.lines = ns.lines + idmap_segs('u', ns.uids).split('\n') -%}
+{%- endif -%}
+{%- if ns.gids -%}
+{%-   set ns.lines = ns.lines + idmap_segs('g', ns.gids).split('\n') -%}
+{%- endif -%}
+{{ (ns.lines | reject('equalto', '') | list | join('\n')).rstrip('\n') }}

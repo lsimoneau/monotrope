@@ -3,3 +3,9 @@
 # `homelab` user on the NAS (see reference_homelab_network) so the LXC's
 # nas_idmap feature lets jellyfin read /media directly over NFS.
 jellyfin_service_uid: 1028
+
+# Set true when the LXC has the `igpu` feature in its lxc_features list,
+# so jellyfin can hardware-transcode via the host iGPU. Aligns the
+# container's render group GID with the host's (passed through via the
+# proxmox_lxc_config idmap) and adds the jellyfin user to render+video.
+jellyfin_igpu: false

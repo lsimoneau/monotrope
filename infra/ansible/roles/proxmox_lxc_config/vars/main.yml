@@ -1,0 +1,32 @@
+---
+# Per-feature contributions to an LXC's host-side config (/etc/pve/lxc/<vmid>.conf).
+#
+# Each feature can contribute:
+#   cgroup_devices    list of `c <maj>:<min> <perms>` rules for lxc.cgroup2.devices.allow
+#   mount_entries     list of `<src> <dst> <fs> <opts>` for lxc.mount.entry
+#   passthrough_uids  list of host UIDs to map identically into the container
+#   passthrough_gids  list of host GIDs to map identically into the container
+#
+# Passthrough UIDs/GIDs across all features for an LXC are unioned and the
+# idmap is computed as a set of segments: identity-mapped at the requested IDs
+# and unprivileged-mapped (cont N → host 100000+N) everywhere else. Each
+# passthrough ID also requires a `root:<id>:1` entry in /etc/subuid /subgid.
+proxmox_lxc_feature_specs:
+  tun:
+    cgroup_devices:
+      - "c 10:200 rwm"
+    mount_entries:
+      - "/dev/net/tun dev/net/tun none bind,create=file"
+  igpu:
+    cgroup_devices:
+      - "c 226:* rwm"  # Direct Rendering Infrastructure (DRI) char devices
+    mount_entries:
+      - "/dev/dri dev/dri none bind,optional,create=dir"
+    passthrough_gids:
+      - "{{ lxc_igpu_video_gid }}"
+      - "{{ lxc_igpu_render_gid }}"
+  nas_idmap:
+    passthrough_uids:
+      - 1028
+    passthrough_gids:
+      - 1028

@@ -1,3 +1,12 @@
 ---
 # Cross-home vars (apply to both the Proxmox host and any LXC).
 # Per-target vars go in proxmox_hosts.yml or lxcs.yml.
+
+# Host-side render/video group GIDs on the Proxmox host. Used by both
+# `proxmox_lxc_config` (to passthrough these GIDs into LXCs via idmap so
+# bind-mounted /dev/dri devices keep their group ownership) and the LXC-
+# side service roles (e.g. `jellyfin`) which align their render group GID
+# to match. `video` is the Debian default; `render` is host-assigned at
+# install time and was 993 on this Proxmox host.
+lxc_igpu_video_gid: 44
+lxc_igpu_render_gid: 993
