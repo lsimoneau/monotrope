@@ -12,3 +12,13 @@ caddy_environment:
 caddy_sites:
   - host: jellyfin.monotrope.au
     upstream: 192.168.0.99:8096
+  - host: qbit.monotrope.au
+    upstream: 192.168.0.98:8080
+  - host: sonarr.monotrope.au
+    upstream: 192.168.0.98:8989
+  - host: radarr.monotrope.au
+    upstream: 192.168.0.98:7878
+  - host: lidarr.monotrope.au
+    upstream: 192.168.0.98:8686
+  - host: prowlarr.monotrope.au
+    upstream: 192.168.0.98:9696

@@ -20,3 +20,10 @@
   roles:
     - role: jellyfin
       jellyfin_igpu: "{{ 'igpu' in (lxc_features | default([])) }}"
+
+- name: Provision media-stack LXC
+  hosts: media-stack
+  become: true
+  roles:
+    - docker
+    - media_stack

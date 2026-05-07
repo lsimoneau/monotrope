@@ -1,0 +1,99 @@
+services:
+  gluetun:
+    image: {{ media_stack_image_gluetun }}
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      VPN_SERVICE_PROVIDER: {{ media_stack_vpn_provider }}
+      VPN_TYPE: {{ media_stack_vpn_type }}
+      WIREGUARD_PRIVATE_KEY: ${WIREGUARD_PRIVATE_KEY}
+      SERVER_COUNTRIES: {{ media_stack_vpn_countries }}
+      TZ: {{ media_stack_tz }}
+      # Allow inbound to qbit's web UI (qbit shares this netns) from LAN.
+      FIREWALL_INPUT_PORTS: {{ media_stack_qbit_webui_port }}
+      # ProtonVPN port forwarding via NAT-PMP. Proton hands out a fresh
+      # port on each tunnel-up; the up-command script pushes it to qbit.
+      VPN_PORT_FORWARDING: "on"
+      VPN_PORT_FORWARDING_PROVIDER: protonvpn
+      VPN_PORT_FORWARDING_UP_COMMAND: /scripts/qbit-port.sh
+    ports:
+      - "{{ media_stack_qbit_webui_port }}:{{ media_stack_qbit_webui_port }}"
+    volumes:
+      - {{ media_stack_dir }}/gluetun:/gluetun
+      - {{ media_stack_dir }}/scripts:/scripts:ro
+    restart: unless-stopped
+
+  qbittorrent:
+    image: {{ media_stack_image_qbit }}
+    container_name: qbittorrent
+    network_mode: service:gluetun
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    environment:
+      PUID: {{ media_stack_puid }}
+      PGID: {{ media_stack_pgid }}
+      TZ: {{ media_stack_tz }}
+      WEBUI_PORT: {{ media_stack_qbit_webui_port }}
+    volumes:
+      - {{ media_stack_dir }}/qbittorrent:/config
+      - {{ media_stack_data_dir }}:/data
+    restart: unless-stopped
+
+  prowlarr:
+    image: {{ media_stack_image_prowlarr }}
+    container_name: prowlarr
+    environment:
+      PUID: {{ media_stack_puid }}
+      PGID: {{ media_stack_pgid }}
+      TZ: {{ media_stack_tz }}
+    volumes:
+      - {{ media_stack_dir }}/prowlarr:/config
+    ports:
+      - "{{ media_stack_prowlarr_port }}:9696"
+    restart: unless-stopped
+
+  sonarr:
+    image: {{ media_stack_image_sonarr }}
+    container_name: sonarr
+    environment:
+      PUID: {{ media_stack_puid }}
+      PGID: {{ media_stack_pgid }}
+      TZ: {{ media_stack_tz }}
+    volumes:
+      - {{ media_stack_dir }}/sonarr:/config
+      - {{ media_stack_data_dir }}:/data
+    ports:
+      - "{{ media_stack_sonarr_port }}:8989"
+    restart: unless-stopped
+
+  radarr:
+    image: {{ media_stack_image_radarr }}
+    container_name: radarr
+    environment:
+      PUID: {{ media_stack_puid }}
+      PGID: {{ media_stack_pgid }}
+      TZ: {{ media_stack_tz }}
+    volumes:
+      - {{ media_stack_dir }}/radarr:/config
+      - {{ media_stack_data_dir }}:/data
+    ports:
+      - "{{ media_stack_radarr_port }}:7878"
+    restart: unless-stopped
+
+  lidarr:
+    image: {{ media_stack_image_lidarr }}
+    container_name: lidarr
+    environment:
+      PUID: {{ media_stack_puid }}
+      PGID: {{ media_stack_pgid }}
+      TZ: {{ media_stack_tz }}
+    volumes:
+      - {{ media_stack_dir }}/lidarr:/config
+      - {{ media_stack_data_dir }}:/data
+    ports:
+      - "{{ media_stack_lidarr_port }}:8686"
+    restart: unless-stopped

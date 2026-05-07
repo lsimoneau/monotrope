@@ -1,0 +1,30 @@
+---
+media_stack_dir: /opt/media-stack
+media_stack_data_dir: /data
+media_stack_puid: 1028
+media_stack_pgid: 1028
+media_stack_tz: Australia/Sydney
+
+# VPN: ProtonVPN over WireGuard via gluetun. Country is enforced server-
+# side; gluetun rotates among that country's P2P-allowed servers.
+media_stack_vpn_provider: protonvpn
+media_stack_vpn_type: wireguard
+media_stack_vpn_countries: Netherlands
+
+# Web UI ports published on the LXC's host IP. qbit's port is exposed
+# through gluetun (qbit shares gluetun's network namespace); the others
+# are on the default compose bridge.
+media_stack_qbit_webui_port: 8080
+media_stack_sonarr_port: 8989
+media_stack_radarr_port: 7878
+media_stack_lidarr_port: 8686
+media_stack_prowlarr_port: 9696
+
+# Image tags. linuxserver.io's :latest is their convention; pin gluetun to
+# the v3 series (current stable major).
+media_stack_image_gluetun: qmcgaw/gluetun:v3
+media_stack_image_qbit: lscr.io/linuxserver/qbittorrent:latest
+media_stack_image_sonarr: lscr.io/linuxserver/sonarr:latest
+media_stack_image_radarr: lscr.io/linuxserver/radarr:latest
+media_stack_image_lidarr: lscr.io/linuxserver/lidarr:latest
+media_stack_image_prowlarr: lscr.io/linuxserver/prowlarr:latest

@@ -1,0 +1,22 @@
+#!/bin/sh
+# Gluetun port-forwarding up-command. Fired whenever ProtonVPN's NAT-PMP
+# hands gluetun a new forwarded port. Pushes that port into qbit's
+# listen_port via the local WebUI API — qbit shares gluetun's netns and
+# has bypass-auth-on-localhost enabled, so no credentials needed.
+set -eu
+
+PORT="$(cat /tmp/gluetun/forwarded_port)"
+[ -n "$PORT" ] || { echo "empty forwarded_port file" >&2; exit 1; }
+WEBUI="http://localhost:{{ media_stack_qbit_webui_port }}"
+
+# Qbit may not have finished starting on the very first tunnel-up; retry.
+for _ in $(seq 1 30); do
+  if wget -q -O /dev/null --timeout=2 "${WEBUI}/api/v2/app/version"; then
+    break
+  fi
+  sleep 2
+done
+
+wget -q -O /dev/null \
+  --post-data "json={\"listen_port\":${PORT}}" \
+  "${WEBUI}/api/v2/app/setPreferences"

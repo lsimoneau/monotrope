@@ -1,0 +1,91 @@
+---
+# Bring up the media stack via docker compose: gluetun (ProtonVPN
+# WireGuard) + qbittorrent (network_mode: service:gluetun) + sonarr +
+# radarr + prowlarr.
+#
+# WireGuard private key comes from `proton_wg_private_key` (vaulted) and
+# is rendered into a 0600 .env file that compose loads at parse time —
+# the rendered compose.yml itself stays free of the secret so it can be
+# inspected without restrictive perms.
+#
+# Library/torrent layout under {{ media_stack_data_dir }} (the NFS bind
+# mount): downloads/ and tv/, movies/ are siblings on the same FS, so
+# *arr apps can hardlink imports from downloads → library without
+# doubling disk usage. The downloads/ subdir already exists on the NAS;
+# qbit categories will create downloads/{tv,movies}/ on first use.
+
+- name: Ensure media stack root directory
+  ansible.builtin.file:
+    path: "{{ media_stack_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Ensure per-service config directories
+  ansible.builtin.file:
+    path: "{{ media_stack_dir }}/{{ item }}"
+    state: directory
+    owner: "{{ media_stack_puid }}"
+    group: "{{ media_stack_pgid }}"
+    mode: '0750'
+  loop:
+    - gluetun
+    - qbittorrent
+    - sonarr
+    - radarr
+    - lidarr
+    - prowlarr
+
+- name: Ensure scripts directory
+  ansible.builtin.file:
+    path: "{{ media_stack_dir }}/scripts"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Render gluetun port-forwarding up-command script
+  ansible.builtin.template:
+    src: qbit-port.sh.j2
+    dest: "{{ media_stack_dir }}/scripts/qbit-port.sh"
+    owner: root
+    group: root
+    mode: '0755'
+  register: media_stack_pfwd_script
+
+- name: Render compose env file with WireGuard private key
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ media_stack_dir }}/.env"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+  register: media_stack_env
+
+- name: Render compose.yml
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ media_stack_dir }}/compose.yml"
+    owner: root
+    group: root
+    mode: '0644'
+  register: media_stack_compose
+
+- name: Bring up media stack
+  ansible.builtin.command:
+    cmd: docker compose up -d --remove-orphans
+    chdir: "{{ media_stack_dir }}"
+  register: media_stack_up
+  changed_when: >-
+    'Started' in media_stack_up.stderr
+    or 'Created' in media_stack_up.stderr
+    or 'Recreate' in media_stack_up.stderr
+
+- name: Restart media stack if compose or env changed
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate
+    chdir: "{{ media_stack_dir }}"
+  when: media_stack_compose.changed or media_stack_env.changed or media_stack_pfwd_script.changed
+  changed_when: true
