@@ -1,0 +1,6 @@
+---
+audiobookshelf_dir: /opt/audiobookshelf
+audiobookshelf_tz: Australia/Sydney
+audiobookshelf_port: 13378
+audiobookshelf_audiobooks_path: /library/audiobooks
+audiobookshelf_image: ghcr.io/advplyr/audiobookshelf:latest

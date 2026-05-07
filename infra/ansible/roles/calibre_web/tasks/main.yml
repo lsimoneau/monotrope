@@ -1,0 +1,40 @@
+---
+# Bring up calibre-web (the Calibre Web Automated fork — adds EPUB→KEPUB
+# auto-conversion and an ingestion folder watcher on top of stock
+# calibre-web). Library lives on the NAS, mounted into the LXC at
+# {{ calibre_web_library_path }}; calibre's own state (users, shelves,
+# DB) is in a named docker volume.
+
+- name: Ensure calibre directory
+  ansible.builtin.file:
+    path: "{{ calibre_web_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Render compose.yml
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ calibre_web_dir }}/compose.yml"
+    owner: root
+    group: root
+    mode: '0644'
+  register: calibre_web_compose
+
+- name: Bring up calibre-web
+  ansible.builtin.command:
+    cmd: docker compose up -d --remove-orphans
+    chdir: "{{ calibre_web_dir }}"
+  register: calibre_web_up
+  changed_when: >-
+    'Started' in calibre_web_up.stderr
+    or 'Created' in calibre_web_up.stderr
+    or 'Recreate' in calibre_web_up.stderr
+
+- name: Restart calibre-web if compose changed
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate
+    chdir: "{{ calibre_web_dir }}"
+  when: calibre_web_compose.changed
+  changed_when: true

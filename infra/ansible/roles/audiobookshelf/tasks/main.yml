@@ -1,0 +1,39 @@
+---
+# Bring up Audiobookshelf. Audiobook files live on the NAS at
+# {{ audiobookshelf_audiobooks_path }}; per-user progress and library
+# metadata live in named docker volumes. Greenfield install — no
+# restore from the old droplet (ABS wasn't deployed there).
+
+- name: Ensure audiobookshelf directory
+  ansible.builtin.file:
+    path: "{{ audiobookshelf_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Render compose.yml
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ audiobookshelf_dir }}/compose.yml"
+    owner: root
+    group: root
+    mode: '0644'
+  register: audiobookshelf_compose
+
+- name: Bring up audiobookshelf
+  ansible.builtin.command:
+    cmd: docker compose up -d --remove-orphans
+    chdir: "{{ audiobookshelf_dir }}"
+  register: audiobookshelf_up
+  changed_when: >-
+    'Started' in audiobookshelf_up.stderr
+    or 'Created' in audiobookshelf_up.stderr
+    or 'Recreate' in audiobookshelf_up.stderr
+
+- name: Restart audiobookshelf if compose changed
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate
+    chdir: "{{ audiobookshelf_dir }}"
+  when: audiobookshelf_compose.changed
+  changed_when: true

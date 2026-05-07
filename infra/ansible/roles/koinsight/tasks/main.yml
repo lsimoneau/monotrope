@@ -1,0 +1,39 @@
+---
+# Bring up KoInsight. Receives full-database uploads from KOReader's
+# statistics plugin on the Kobo — not delta sync, so the SQLite at
+# /app/data is overwritten on each upload. Greenfield install; no
+# restore from the old droplet.
+
+- name: Ensure koinsight directory
+  ansible.builtin.file:
+    path: "{{ koinsight_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Render compose.yml
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ koinsight_dir }}/compose.yml"
+    owner: root
+    group: root
+    mode: '0644'
+  register: koinsight_compose
+
+- name: Bring up koinsight
+  ansible.builtin.command:
+    cmd: docker compose up -d --remove-orphans
+    chdir: "{{ koinsight_dir }}"
+  register: koinsight_up
+  changed_when: >-
+    'Started' in koinsight_up.stderr
+    or 'Created' in koinsight_up.stderr
+    or 'Recreate' in koinsight_up.stderr
+
+- name: Restart koinsight if compose changed
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate
+    chdir: "{{ koinsight_dir }}"
+  when: koinsight_compose.changed
+  changed_when: true

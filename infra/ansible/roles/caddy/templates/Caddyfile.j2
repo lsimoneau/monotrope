@@ -3,7 +3,7 @@
 }
 
 {{ caddy_wildcard_host }} {
-  bind {{ caddy_bind_address }}
+  bind {{ (caddy_bind_address if caddy_bind_address is sequence and caddy_bind_address is not string else [caddy_bind_address]) | join(' ') }}
   tls {
     dns cloudflare {env.CLOUDFLARE_API_TOKEN}
   }

@@ -1,0 +1,11 @@
+services:
+  koinsight:
+    image: {{ koinsight_image }}
+    restart: unless-stopped
+    ports:
+      - "{{ koinsight_port }}:3000"
+    volumes:
+      - data:/app/data
+
+volumes:
+  data:

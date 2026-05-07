@@ -1,0 +1,16 @@
+services:
+  calibre-web:
+    image: {{ calibre_web_image }}
+    restart: unless-stopped
+    ports:
+      - "{{ calibre_web_port }}:8083"
+    volumes:
+      - calibre_config:/config
+      - {{ calibre_web_library_path }}:/calibre-library
+    environment:
+      PUID: "{{ calibre_web_puid }}"
+      PGID: "{{ calibre_web_pgid }}"
+      TZ: "{{ calibre_web_tz }}"
+
+volumes:
+  calibre_config:

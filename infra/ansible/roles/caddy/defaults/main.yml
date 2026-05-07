@@ -7,7 +7,7 @@
 
 caddy_plugins: []
 caddy_email: ""
-caddy_bind_address: ""
+caddy_bind_address: ""  # string or list of strings — multiple addresses bind on each
 caddy_wildcard_host: ""
 caddy_environment: {}
 

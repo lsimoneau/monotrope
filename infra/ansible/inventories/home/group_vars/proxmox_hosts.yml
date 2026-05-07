@@ -2,7 +2,9 @@
 # Vars applied to the Proxmox host (currently just `pve`).
 
 caddy_email: louis@monotrope.au
-caddy_bind_address: 100.88.127.39  # tailscale0 on pve
+caddy_bind_address:
+  - 100.88.127.39   # tailscale0 on pve
+  - 192.168.0.59    # LAN — for Kobo / phone hitting calibre / abs / koinsight
 caddy_wildcard_host: "*.monotrope.au"
 caddy_plugins:
   - github.com/caddy-dns/cloudflare
@@ -22,3 +24,9 @@ caddy_sites:
     upstream: 192.168.0.98:8686
   - host: prowlarr.monotrope.au
     upstream: 192.168.0.98:9696
+  - host: calibre.monotrope.au
+    upstream: 192.168.0.97:8083
+  - host: abs.monotrope.au
+    upstream: 192.168.0.97:13378
+  - host: koinsight.monotrope.au
+    upstream: 192.168.0.97:3001

@@ -27,3 +27,12 @@
   roles:
     - docker
     - media_stack
+
+- name: Provision apps LXC
+  hosts: apps
+  become: true
+  roles:
+    - docker
+    - calibre_web
+    - audiobookshelf
+    - koinsight

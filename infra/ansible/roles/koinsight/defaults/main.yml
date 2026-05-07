@@ -1,0 +1,4 @@
+---
+koinsight_dir: /opt/koinsight
+koinsight_port: 3001
+koinsight_image: ghcr.io/georgesg/koinsight:latest
