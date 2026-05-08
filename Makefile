@@ -1,87 +1,23 @@
-.PHONY: build serve deploy ssh setup infra logs miniflux goatcounter enrich wireguard calibre calibre-sync koinsight wallabag obsidian obsidian-login backup-setup backup
+.PHONY: build serve enrich home
 
-DEPLOY_USER := deploy
-
-# Read the VPS host from its inventory (single source of truth — Ansible
-# uses the same file at runtime via -i below).
-VPS_INVENTORY := infra/ansible/inventories/vps/hosts.yml
-MONOTROPE_HOST := $(shell awk -F': *' '/ansible_host:/ {gsub(/[" ]/, "", $$2); print $$2}' $(VPS_INVENTORY))
-
-# ansible-playbook picks this up automatically; covers all targets below.
 ANSIBLE_VAULT_PASSWORD_FILE := .vault_pass
+HOME_INVENTORY := infra/ansible/inventories/home
 
-export MONOTROPE_HOST DEPLOY_USER ANSIBLE_VAULT_PASSWORD_FILE
+export ANSIBLE_VAULT_PASSWORD_FILE
 
+# Hugo is built and deployed by Cloudflare Pages on push to main; these
+# targets are for local preview only.
 build:
 	cd site && hugo --minify
 
 serve:
 	cd site && hugo server --buildDrafts --disableFastRender
 
-deploy:
-	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	bash deploy.sh
-
-ssh:
-	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ssh $(DEPLOY_USER)@$(MONOTROPE_HOST)
-
-setup infra:
-	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml
-
-logs:
-	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ssh -t root@$(MONOTROPE_HOST) mlogs $(ARGS)
-
-miniflux:
-	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags miniflux
-
-goatcounter:
-	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags goatcounter
-
-obsidian:
-	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags obsidian
-
-# Re-authenticate the headless Obsidian Sync client.
-# Run when sync starts logging "Failed to authenticate: Not logged in".
-# Override the email by passing EMAIL=... on the command line.
-OBSIDIAN_EMAIL ?= simoneau.louis@gmail.com
-obsidian-login:
-	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ssh -t root@$(MONOTROPE_HOST) docker exec -it obsidian-sync ob login --email $(OBSIDIAN_EMAIL)
-	ssh root@$(MONOTROPE_HOST) docker restart obsidian-sync
-
-wireguard:
-	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags wireguard
-
-calibre:
-	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags calibre
-
-calibre-sync:
-	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ssh root@$(MONOTROPE_HOST) /opt/calibre/sync.sh
-
-koinsight:
-	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags koinsight
-
-wallabag:
-	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags wallabag
-
+# Enrich book reviews with ISBN + cover from OpenLibrary.
 enrich:
 	uv run enrich.py
 
-backup-setup:
-	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags backup
-
-backup:
-	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ssh root@$(MONOTROPE_HOST) /usr/local/bin/monotrope-backup $(LABEL)
+# Apply the home Ansible playbook (Proxmox host + LXCs).
+# Pass LIMIT=apps (or another host pattern) to scope it.
+home:
+	ansible-playbook -i $(HOME_INVENTORY) infra/ansible/home.yml $(if $(LIMIT),--limit $(LIMIT),) $(if $(TAGS),--tags $(TAGS),)

@@ -30,3 +30,5 @@ caddy_sites:
     upstream: 192.168.0.97:13378
   - host: koinsight.monotrope.au
     upstream: 192.168.0.97:3001
+  - host: reader.monotrope.au
+    upstream: 192.168.0.97:8080

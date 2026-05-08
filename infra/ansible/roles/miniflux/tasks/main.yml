@@ -1,0 +1,44 @@
+---
+- name: Ensure miniflux directory
+  ansible.builtin.file:
+    path: "{{ miniflux_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Render compose.yml
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ miniflux_dir }}/compose.yml"
+    owner: root
+    group: root
+    mode: '0644'
+  register: miniflux_compose
+
+- name: Render .env
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ miniflux_dir }}/.env"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+  register: miniflux_env
+
+- name: Bring up miniflux
+  ansible.builtin.command:
+    cmd: docker compose up -d --pull always --remove-orphans
+    chdir: "{{ miniflux_dir }}"
+  register: miniflux_up
+  changed_when: >-
+    'Started' in miniflux_up.stderr
+    or 'Created' in miniflux_up.stderr
+    or 'Recreate' in miniflux_up.stderr
+
+- name: Restart miniflux if compose or env changed
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate
+    chdir: "{{ miniflux_dir }}"
+  when: miniflux_compose.changed or miniflux_env.changed
+  changed_when: true

@@ -20,18 +20,24 @@ CSS. The design should feel minimal, typographic, and monospaced-first.
 
 ## Hosting
 
-DigitalOcean droplet, Sydney region, Ubuntu 24.04 LTS.
+- **Public site** (`monotrope.au`) — Hugo static site on Cloudflare Pages,
+  auto-built and deployed on push to `main`. Cloudflare Web Analytics is
+  injected at the edge (no template hook).
+- **Personal services** — run on the OptiPlex 7090 homelab (Proxmox VE,
+  several LXCs + a Home Assistant VM), reachable over Tailscale via
+  `*.monotrope.au` (wildcard CNAME → Proxmox tailscale0). Caddy on the
+  Proxmox host terminates TLS with a wildcard cert via Cloudflare DNS-01.
 
-### What's on the server
+### What runs where
 
-- **Hugo static site** — built locally, rsynced to `/var/www/monotrope`
-- **Caddy** — reverse proxy and TLS for all services
-- **Miniflux** — RSS reader (Docker, PostgreSQL)
-- **Gitea** — self-hosted git server (Docker, PostgreSQL, SSH on port 2222)
-- **GoatCounter** — privacy-friendly analytics (native binary, SQLite)
-- **Hermes Agent** — Nous Research's LLM agent (`nousresearch/hermes-agent`),
-  exposed via Telegram bot. Routes through OpenRouter. Used as a personal
-  assistant reachable from mobile. Docker, config in `infra/hermes/`.
+- **Cloudflare Pages**: Hugo static site, www → apex redirect.
+- **`apps` LXC** (192.168.0.97): Calibre-Web, Audiobookshelf, KoInsight,
+  Miniflux (with its own Postgres). Reachable as
+  `{calibre,abs,koinsight,reader}.monotrope.au` via Caddy on Proxmox.
+- **`hermes` LXC** (192.168.0.96): Hermes Agent (native install, not Docker)
+  — Telegram + email gateways, MCP servers, browser automation sandbox.
+- **`jellyfin` LXC**, **`media-stack` LXC**: media playback + acquisition.
+- **HAOS VM**: Home Assistant.
 
 ## Conventions
 
@@ -39,4 +45,6 @@ DigitalOcean droplet, Sydney region, Ubuntu 24.04 LTS.
 - All server changes go through Ansible — no one-off SSH commands
 - Ansible tasks must be idempotent
 - Australian English in content and comments
-- No CI/CD — deploys are manual via `make deploy`
+- Hugo deploys via Cloudflare Pages on push to `main`; `make build` /
+  `make serve` are local-preview only
+- Home services deploy via `make home` (optionally `LIMIT=...`, `TAGS=...`)

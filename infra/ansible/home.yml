@@ -36,6 +36,7 @@
     - calibre_web
     - audiobookshelf
     - koinsight
+    - miniflux
 
 - name: Provision hermes LXC
   hosts: hermes

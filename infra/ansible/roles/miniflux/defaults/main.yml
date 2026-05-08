@@ -1,0 +1,6 @@
+---
+miniflux_dir: /opt/miniflux
+miniflux_image: miniflux/miniflux:2.2.19
+miniflux_db_image: postgres:16-alpine
+miniflux_port: 8080
+miniflux_base_url: https://reader.monotrope.au

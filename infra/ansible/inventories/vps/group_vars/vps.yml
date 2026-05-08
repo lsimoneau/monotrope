@@ -1,7 +1,0 @@
----
-# VPS-only vars. Cross-environment vars and shared secrets stay in
-# ../../../group_vars/all/.
-
-# Wireguard client (this deploy machine) pubkey — declared on the VPS's
-# wireguard interface allowed-peers list.
-wg_client_pubkey: v+3fFaRIoT20tl2ZOzhI8zEn2jHmYLRVBuozrFt+8Gc=
