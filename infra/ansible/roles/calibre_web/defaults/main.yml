@@ -5,4 +5,4 @@ calibre_web_pgid: 1028
 calibre_web_tz: Australia/Sydney
 calibre_web_port: 8083
 calibre_web_library_path: /library/books
-calibre_web_image: crocodilestick/calibre-web-automated:latest
+calibre_web_image: calibre-web-cwa-kobodl:latest

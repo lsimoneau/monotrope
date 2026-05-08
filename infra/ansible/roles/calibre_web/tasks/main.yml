@@ -1,9 +1,12 @@
 ---
-# Bring up calibre-web (the Calibre Web Automated fork — adds EPUB→KEPUB
-# auto-conversion and an ingestion folder watcher on top of stock
-# calibre-web). Library lives on the NAS, mounted into the LXC at
-# {{ calibre_web_library_path }}; calibre's own state (users, shelves,
-# DB) is in a named docker volume.
+# Bring up calibre-web (Calibre Web Automated fork — adds EPUB→KEPUB
+# auto-conversion and an ingestion-folder watcher). Library lives on the
+# NAS, mounted into the LXC at {{ calibre_web_library_path }}; calibre's
+# own state is in named docker volumes.
+#
+# The image is built locally on the apps LXC (no external registry):
+# calibre-web-automated + a kobodl venv symlinked to /usr/local/bin so
+# `docker exec calibre-web kobodl ...` works for ad-hoc Kobo downloads.
 
 - name: Ensure calibre directory
   ansible.builtin.file:
@@ -12,6 +15,31 @@
     owner: root
     group: root
     mode: '0750'
+
+- name: Ensure build context directory
+  ansible.builtin.file:
+    path: "{{ calibre_web_dir }}/build"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Sync Dockerfile to build context
+  ansible.builtin.copy:
+    src: Dockerfile
+    dest: "{{ calibre_web_dir }}/build/Dockerfile"
+    owner: root
+    group: root
+    mode: '0644'
+  register: calibre_web_dockerfile
+
+- name: Build calibre-web image
+  ansible.builtin.command:
+    cmd: docker build -t {{ calibre_web_image }} .
+    chdir: "{{ calibre_web_dir }}/build"
+  when: calibre_web_dockerfile.changed
+  register: calibre_web_build
+  changed_when: true
 
 - name: Render compose.yml
   ansible.builtin.template:
@@ -32,9 +60,9 @@
     or 'Created' in calibre_web_up.stderr
     or 'Recreate' in calibre_web_up.stderr
 
-- name: Restart calibre-web if compose changed
+- name: Restart calibre-web if compose or image changed
   ansible.builtin.command:
     cmd: docker compose up -d --force-recreate
     chdir: "{{ calibre_web_dir }}"
-  when: calibre_web_compose.changed
+  when: calibre_web_compose.changed or calibre_web_build.changed
   changed_when: true

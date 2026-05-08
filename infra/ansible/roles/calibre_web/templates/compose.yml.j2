@@ -1,11 +1,13 @@
 services:
   calibre-web:
     image: {{ calibre_web_image }}
+    pull_policy: never
     restart: unless-stopped
     ports:
       - "{{ calibre_web_port }}:8083"
     volumes:
       - calibre_config:/config
+      - kobodl_config:/root/.config/kobodl
       - {{ calibre_web_library_path }}:/calibre-library
     environment:
       PUID: "{{ calibre_web_puid }}"
@@ -14,3 +16,4 @@ services:
 
 volumes:
   calibre_config:
+  kobodl_config:
