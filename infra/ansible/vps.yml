@@ -49,7 +49,6 @@
       notify: Restart Caddy
       tags:
         - miniflux
-        - gitea
         - goatcounter
         - calibre
         - koinsight
@@ -140,12 +139,6 @@
       ufw:
         rule: allow
         port: '443'
-        proto: tcp
-
-    - name: Allow Gitea SSH
-      ufw:
-        rule: allow
-        port: '2222'
         proto: tcp
 
     - name: Enable UFW
@@ -368,43 +361,6 @@
       args:
         chdir: /opt/miniflux
       tags: miniflux
-
-    # ── Gitea ───────────────────────────────────────────────────────────────
-
-    - name: Create Gitea directory
-      file:
-        path: /opt/gitea
-        state: directory
-        owner: root
-        group: root
-        mode: '0750'
-      tags: gitea
-
-    - name: Copy Gitea docker-compose.yml
-      copy:
-        src: ../gitea/docker-compose.yml
-        dest: /opt/gitea/docker-compose.yml
-        owner: root
-        group: root
-        mode: '0640'
-      tags: gitea
-
-    - name: Write Gitea .env
-      copy:
-        dest: /opt/gitea/.env
-        owner: root
-        group: root
-        mode: '0600'
-        content: |
-          GITEA_DB_PASSWORD={{ gitea_db_password }}
-      no_log: true
-      tags: gitea
-
-    - name: Pull and start Gitea
-      command: docker compose up -d --pull always
-      args:
-        chdir: /opt/gitea
-      tags: gitea
 
     # ── Obsidian Headless Sync ─────────────────────────────────────────────
     # Runs obsidian-headless (npm: obsidian-headless) as a long-lived
@@ -670,107 +626,6 @@
         daemon_reload: true
       tags: hermes
 
-    # ── Hermes state sync to gitea ────────────────────────────────────────
-    # Periodic git push of diff-able content in the hermes_data volume
-    # (skills/, cron/, SOUL.md, config.yaml) to a private hermes-state repo
-    # in gitea. Gives version history + offsite copy of hermes' evolution.
-    # Bootstrap (done manually once, not automated here):
-    #   1. Create a gitea access token: `docker exec -u git gitea gitea
-    #      admin user generate-access-token --username louis
-    #      --token-name hermes-sync --scopes write:repository`
-    #   2. Store it in HERMES_STATE_SYNC_TOKEN env var locally.
-    #   3. Create private repo `louis/hermes-state` in gitea.
-    #   4. `git init` in the volume and do the initial push.
-
-    - name: Write hermes-state-sync token file
-      copy:
-        dest: /etc/hermes-state-sync.token
-        owner: root
-        group: root
-        mode: '0600'
-        content: "{{ hermes_state_sync_token }}"
-      no_log: true
-      when: hermes_state_sync_token | length > 0
-      tags: hermes
-
-    - name: Install hermes-state-sync script
-      copy:
-        dest: /usr/local/bin/hermes-state-sync
-        owner: root
-        group: root
-        mode: '0755'
-        content: |
-          #!/bin/bash
-          # Sync hermes_data volume (authored + evolving markdown state) to
-          # the hermes-state repo in gitea. No-op when nothing changed.
-          set -euo pipefail
-          TOKEN=$(cat /etc/hermes-state-sync.token)
-          docker run --rm \
-            --network monotrope \
-            -v hermes_hermes_data:/data \
-            -e HOME=/tmp \
-            -e TOKEN="$TOKEN" \
-            --user 10000:10000 \
-            --entrypoint /bin/sh \
-            -w /data \
-            alpine/git:latest \
-            -c "
-              set -eu
-              GIT=\"git -c safe.directory=/data -c user.name=hermes-sync -c user.email=hermes@monotrope.au -c core.fileMode=false\"
-              \$GIT add -A
-              if \$GIT diff --cached --quiet; then
-                echo \"no changes\"
-                exit 0
-              fi
-              \$GIT commit -m \"Auto-sync \$(date -u +%Y-%m-%dT%H:%MZ)\"
-              \$GIT push \"http://hermes-sync:\${TOKEN}@gitea:3000/louis/hermes-state.git\" HEAD:main
-            "
-      tags: hermes
-
-    - name: Install hermes-state-sync systemd service
-      copy:
-        dest: /etc/systemd/system/hermes-state-sync.service
-        owner: root
-        group: root
-        mode: '0644'
-        content: |
-          [Unit]
-          Description=Sync hermes state to gitea
-          After=docker.service
-          Requires=docker.service
-
-          [Service]
-          Type=oneshot
-          ExecStart=/usr/local/bin/hermes-state-sync
-      tags: hermes
-
-    - name: Install hermes-state-sync systemd timer
-      copy:
-        dest: /etc/systemd/system/hermes-state-sync.timer
-        owner: root
-        group: root
-        mode: '0644'
-        content: |
-          [Unit]
-          Description=Sync hermes state to gitea every 30 minutes
-
-          [Timer]
-          OnCalendar=*:0,30:00
-          Persistent=true
-
-          [Install]
-          WantedBy=timers.target
-      tags: hermes
-
-    - name: Enable and start hermes-state-sync timer
-      systemd:
-        name: hermes-state-sync.timer
-        enabled: true
-        state: started
-        daemon_reload: true
-      tags: hermes
-
-
     # ── Calibre (calibre-web + kobodl + MCP server) ──────────────────────
 
     - name: Create Calibre directory
@@ -1012,7 +867,6 @@
         chdir: "{{ item }}"
       loop:
         - /opt/miniflux
-        - /opt/gitea
         - /opt/obsidian
         - /opt/hermes
         - /opt/calibre
@@ -1044,7 +898,6 @@
               "hermes-agent": "\033[33m",
               "hermes":       "\033[33m",
               "miniflux":     "\033[32m",
-              "gitea":        "\033[34m",
               "calibre":      "\033[31m",
               "koinsight":    "\033[37m",
               "wallabag":     "\033[95m",

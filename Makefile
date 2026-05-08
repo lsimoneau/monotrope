@@ -1,4 +1,4 @@
-.PHONY: build serve deploy ssh setup infra logs miniflux gitea goatcounter hermes hermes-sync hermes-chat hermes-cli enrich wireguard calibre calibre-build calibre-sync koinsight wallabag obsidian obsidian-login backup-setup backup
+.PHONY: build serve deploy ssh setup infra logs miniflux goatcounter hermes hermes-sync hermes-chat hermes-cli enrich wireguard calibre calibre-sync koinsight wallabag obsidian obsidian-login backup-setup backup
 
 DEPLOY_USER := deploy
 
@@ -37,10 +37,6 @@ logs:
 miniflux:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
 	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags miniflux
-
-gitea:
-	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags gitea
 
 goatcounter:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
@@ -96,11 +92,7 @@ wireguard:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
 	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags wireguard
 
-calibre-build:
-	docker build -t git.monotrope.au/louis/calibre-web:latest infra/calibre/
-	docker push git.monotrope.au/louis/calibre-web:latest
-
-calibre: calibre-build
+calibre:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
 	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags calibre
 

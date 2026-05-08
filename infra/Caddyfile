@@ -47,19 +47,6 @@ reader.monotrope.au {
 	encode zstd gzip
 }
 
-# Gitea
-git.monotrope.au {
-	reverse_proxy localhost:3000
-
-	header {
-		X-Content-Type-Options "nosniff"
-		Referrer-Policy "strict-origin-when-cross-origin"
-		Permissions-Policy "camera=(), microphone=(), geolocation=()"
-	}
-
-	encode zstd gzip
-}
-
 # Calibre-web
 books.monotrope.au {
 	reverse_proxy localhost:8083

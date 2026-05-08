@@ -37,9 +37,6 @@ On a fresh machine cloning this repo for the first time:
    `infra/ansible/group_vars/all/vars.yml` (`monotrope_host`); both
    the Makefile and `deploy.sh` derive it from there.
 
-4. **For pushing the calibre-web image** (only needed for
-   `make calibre-build`): `docker login git.monotrope.au`.
-
 That's it. `make setup` provisions the whole server idempotently;
 individual services have their own tag (`make miniflux`, `make hermes`,
 etc.). `make deploy` builds and rsyncs the static site.

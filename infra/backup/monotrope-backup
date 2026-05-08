@@ -29,17 +29,11 @@ docker compose -f /opt/miniflux/docker-compose.yml exec -T db \
   | restic backup --stdin --stdin-filename miniflux.pgdump \
       --tag postgres --tag "$LABEL"
 
-docker compose -f /opt/gitea/docker-compose.yml exec -T db \
-  pg_dump -U gitea -Fc gitea \
-  | restic backup --stdin --stdin-filename gitea.pgdump \
-      --tag postgres --tag "$LABEL"
-
 echo "==> docker volumes"
 restic backup --tag volumes --tag "$LABEL" \
   /var/lib/docker/volumes/hermes_hermes_data/_data \
   /var/lib/docker/volumes/obsidian_obsidian_vault/_data \
   /var/lib/docker/volumes/obsidian_obsidian_config/_data \
-  /var/lib/docker/volumes/gitea_gitea_data/_data \
   /var/lib/docker/volumes/calibre_library/_data \
   /var/lib/docker/volumes/calibre_books/_data \
   /var/lib/docker/volumes/calibre_kobodl_config/_data \
