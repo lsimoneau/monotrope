@@ -5,8 +5,6 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User={{ hermes_user }}
-Group={{ hermes_user }}
 Environment=HERMES_HOME={{ hermes_home }}
 EnvironmentFile=/etc/default/hermes-gateway
 ExecStart=/usr/local/bin/hermes gateway run

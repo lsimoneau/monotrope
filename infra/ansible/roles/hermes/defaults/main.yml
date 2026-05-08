@@ -1,22 +1,16 @@
 ---
-# Native (non-Docker) Hermes Agent install in an LXC.
+# Native (non-Docker) Hermes Agent install in an LXC. Path layout matches
+# the upstream FHS-root install (see scripts/install.sh in hermes-agent).
+# The LXC itself is the sandbox — Hermes runs as root inside.
 
-# Pin to the same version that ran in Docker on the VPS at migration time.
-# Bump independently of the docker image once the LXC is the source of truth.
+# Bump independently of the docker image now that the LXC is the source of
+# truth. v2026.4.13 was the docker tag at migration; safe to advance.
 hermes_version: v2026.4.13
 hermes_repo_url: https://github.com/NousResearch/hermes-agent.git
 
-# Filesystem layout. /opt/data matches the docker container path so a state
-# rsync from the VPS volume drops in unchanged.
+# Filesystem layout. Matches upstream FHS-root install.sh defaults.
 hermes_install_dir: /usr/local/lib/hermes-agent
-hermes_home: /opt/data
-
-# UID/GID of the in-LXC service user. Matches the upstream Docker image's
-# `hermes` user (UID 10000) so file ownership in /opt/data survives the
-# rsync from the VPS docker volume without a chown pass.
-hermes_user: hermes
-hermes_uid: 10000
-hermes_gid: 10000
+hermes_home: /root/.hermes
 
 # Public URL for the Miniflux instance still hosted on the VPS — the plugin
 # can no longer reach it on the docker-internal network from the LXC.

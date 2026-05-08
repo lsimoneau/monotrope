@@ -1,13 +1,12 @@
 ---
 # Native (non-Docker) Hermes Agent install. The LXC itself is the sandbox —
-# Hermes runs under systemd, gets to apt install / write anywhere within the
-# container's filesystem, and is firewalled at the Proxmox level rather than
-# at a docker-network boundary.
+# Hermes runs as root under systemd, gets to apt install / write anywhere
+# within the container's filesystem, and is firewalled at the Proxmox level
+# rather than at a docker-network boundary.
 #
-# State (auth tokens, sessions, memories, state.db, evolved skills) lives in
-# {{ hermes_home }}, owned by the hermes user. The first deploy expects an
-# rsync of /opt/data from the VPS docker volume to land here before the
-# service starts; see project_homelab_progress.md.
+# Path layout matches the upstream FHS-root install (scripts/install.sh in
+# hermes-agent). State (auth tokens, sessions, memories, state.db, evolved
+# skills) lives in {{ hermes_home }} (default /root/.hermes/).
 
 - name: Install runtime dependencies
   ansible.builtin.apt:
@@ -33,29 +32,13 @@
     creates: /usr/local/bin/uv
     executable: /bin/bash
 
-- name: Ensure hermes group with stable GID
-  ansible.builtin.group:
-    name: "{{ hermes_user }}"
-    gid: "{{ hermes_gid }}"
-    state: present
-
-- name: Ensure hermes user with stable UID
-  ansible.builtin.user:
-    name: "{{ hermes_user }}"
-    uid: "{{ hermes_uid }}"
-    group: "{{ hermes_user }}"
-    home: "{{ hermes_home }}"
-    shell: /bin/bash
-    create_home: false
-    state: present
-
 - name: Ensure HERMES_HOME exists
   ansible.builtin.file:
     path: "{{ hermes_home }}"
     state: directory
-    owner: "{{ hermes_user }}"
-    group: "{{ hermes_user }}"
-    mode: '0750'
+    owner: root
+    group: root
+    mode: '0700'
 
 - name: Clone hermes-agent at pinned ref
   ansible.builtin.git:
@@ -92,26 +75,26 @@
   ansible.builtin.copy:
     src: config.yaml
     dest: "{{ hermes_home }}/config.yaml"
-    owner: "{{ hermes_user }}"
-    group: "{{ hermes_user }}"
-    mode: '0640'
+    owner: root
+    group: root
+    mode: '0600'
   notify: Restart hermes-gateway
 
 - name: Stage plugins directory
   ansible.builtin.copy:
     src: plugins/
     dest: "{{ hermes_home }}/plugins/"
-    owner: "{{ hermes_user }}"
-    group: "{{ hermes_user }}"
-    mode: '0640'
-    directory_mode: '0750'
+    owner: root
+    group: root
+    mode: '0600'
+    directory_mode: '0700'
   notify: Restart hermes-gateway
 
 - name: Write Miniflux plugin config
   ansible.builtin.copy:
     dest: "{{ hermes_home }}/plugins/miniflux/config.json"
-    owner: "{{ hermes_user }}"
-    group: "{{ hermes_user }}"
+    owner: root
+    group: root
     mode: '0600'
     content: |
       {
@@ -128,9 +111,9 @@
 - name: Stage seed skills
   ansible.builtin.copy:
     src: seeds/
-    dest: /opt/hermes-seeds/
-    owner: "{{ hermes_user }}"
-    group: "{{ hermes_user }}"
+    dest: /usr/local/share/hermes-seeds/
+    owner: root
+    group: root
     mode: '0644'
     directory_mode: '0755'
 
@@ -138,28 +121,21 @@
   ansible.builtin.file:
     path: "{{ hermes_home }}/skills"
     state: directory
-    owner: "{{ hermes_user }}"
-    group: "{{ hermes_user }}"
-    mode: '0750'
+    owner: root
+    group: root
+    mode: '0700'
 
 - name: Plant seed skills (no-clobber)
-  ansible.builtin.command: cp -rn /opt/hermes-seeds/. {{ hermes_home }}/skills/
+  ansible.builtin.command: cp -rn /usr/local/share/hermes-seeds/. {{ hermes_home }}/skills/
   changed_when: false
-
-- name: Reown skills directory tree
-  ansible.builtin.file:
-    path: "{{ hermes_home }}/skills"
-    owner: "{{ hermes_user }}"
-    group: "{{ hermes_user }}"
-    recurse: true
 
 - name: Write gateway environment file
   ansible.builtin.template:
     src: hermes-gateway.env.j2
     dest: /etc/default/hermes-gateway
     owner: root
-    group: "{{ hermes_user }}"
-    mode: '0640'
+    group: root
+    mode: '0600'
   no_log: true
   notify: Restart hermes-gateway
 
