@@ -321,7 +321,6 @@
       failed_when: docker_net.rc != 0 and 'already exists' not in docker_net.stderr
       tags:
         - miniflux
-        - hermes
 
     # ── Miniflux ────────────────────────────────────────────────────────────
 
@@ -364,10 +363,8 @@
 
     # ── Obsidian Headless Sync ─────────────────────────────────────────────
     # Runs obsidian-headless (npm: obsidian-headless) as a long-lived
-    # sync daemon against a shared docker volume. Hermes mounts the same
-    # volume read-write and reaches the vault via direct filesystem calls.
-    # No Electron on the server; template expansion happens next time the
-    # note is opened on desktop.
+    # sync daemon against a docker volume. No Electron on the server;
+    # template expansion happens next time the note is opened on desktop.
     # Bootstrap (one-time):
     #   1. Set OBSIDIAN_VAULT_NAME in the env the playbook runs with
     #      (matches the name from `ob sync-list-remote`).
@@ -375,8 +372,6 @@
     #   3. `make obsidian-login` to do the interactive Obsidian Sync
     #      login inside the container — credentials persist in the
     #      obsidian_config volume. Re-run after a session is revoked.
-    # Must run before Hermes so the external volume exists when Hermes
-    # recreates with its new /vault mount.
 
     - name: Create Obsidian directory
       file:
@@ -437,194 +432,6 @@
       args:
         chdir: /opt/obsidian
       tags: obsidian
-
-    # ── Hermes Agent ────────────────────────────────────────────────────────
-
-    - name: Create Hermes directory
-      file:
-        path: /opt/hermes
-        state: directory
-        owner: root
-        group: root
-        mode: '0750'
-      tags: hermes
-
-    - name: Copy Hermes docker-compose.yml
-      copy:
-        src: ../hermes/docker-compose.yml
-        dest: /opt/hermes/docker-compose.yml
-        owner: root
-        group: root
-        mode: '0640'
-      tags: hermes
-
-    - name: Stage Hermes config.yaml
-      copy:
-        src: ../hermes/config.yaml
-        dest: /opt/hermes/config.yaml
-        owner: root
-        group: root
-        mode: '0640'
-      tags: hermes
-
-    - name: Copy config.yaml into Hermes volume
-      command: docker cp /opt/hermes/config.yaml hermes:/opt/data/config.yaml
-      notify: Restart Hermes
-      tags: hermes
-
-    - name: Ensure config.yaml is readable by hermes user inside container
-      command: docker exec -u 0 hermes chmod 644 /opt/data/config.yaml
-      notify: Restart Hermes
-      tags: hermes
-
-    - name: Copy Hermes plugins
-      copy:
-        src: ../hermes/plugins/
-        dest: /opt/hermes/plugins/
-        owner: root
-        group: root
-        mode: '0640'
-        directory_mode: '0750'
-      notify: Restart Hermes
-      tags: hermes
-
-    # Authored skills ("seeds") live in the repo. Hermes owns its evolved copies
-    # inside the hermes_data volume; we copy seeds in no-clobber so deploys never
-    # overwrite agent-modified skills. For fresh installs this plants the seeds
-    # before first boot; for existing installs it only adds new seed files.
-    - name: Stage Hermes seed skills on host
-      copy:
-        src: ../hermes/seeds/
-        dest: /opt/hermes/seeds/
-        owner: root
-        group: root
-        mode: '0644'
-        directory_mode: '0755'
-      tags: hermes
-
-    - name: Ensure hermes_data volume exists
-      command: docker volume create hermes_hermes_data
-      register: hermes_volume
-      changed_when: hermes_volume.rc == 0 and 'already exists' not in (hermes_volume.stderr | default(''))
-      failed_when: hermes_volume.rc != 0 and 'already exists' not in (hermes_volume.stderr | default(''))
-      tags: hermes
-
-    - name: Seed authored skills into hermes_data volume (no-clobber)
-      command: >
-        docker run --rm
-        -v hermes_hermes_data:/data
-        -v /opt/hermes/seeds:/seeds:ro
-        --user 10000:10000
-        alpine
-        sh -c "mkdir -p /data/skills && cp -rn /seeds/. /data/skills/"
-      register: hermes_seed
-      changed_when: false
-      tags: hermes
-
-    - name: Write Miniflux plugin config
-      copy:
-        dest: /opt/hermes/plugins/miniflux/config.json
-        owner: root
-        group: root
-        mode: '0600'
-        content: |
-          {
-            "base_url": "http://miniflux:8080",
-            "api_key": "{{ hermes_miniflux_api_key }}"
-          }
-      no_log: true
-      notify: Restart Hermes
-      tags: hermes
-
-    - name: Write Hermes .env
-      copy:
-        dest: /opt/hermes/.env
-        owner: root
-        group: root
-        mode: '0600'
-        content: |
-          OPENROUTER_API_KEY={{ hermes_openrouter_api_key }}
-          TELEGRAM_BOT_TOKEN={{ hermes_telegram_bot_token }}
-          TELEGRAM_ALLOWED_USERS={{ hermes_telegram_allowed_users }}
-          EMAIL_ADDRESS=monotrope.agent@gmail.com
-          EMAIL_PASSWORD={{ hermes_email_password }}
-          EMAIL_IMAP_HOST=imap.gmail.com
-          EMAIL_SMTP_HOST=smtp.gmail.com
-          EMAIL_ALLOWED_USERS={{ hermes_email_allowed_users }}
-          BROWSERBASE_API_KEY={{ hermes_browserbase_api_key }}
-          BROWSERBASE_PROJECT_ID={{ hermes_browserbase_project_id }}
-      no_log: true
-      tags: hermes
-
-    - name: Pull and start Hermes
-      command: docker compose up -d --pull always
-      args:
-        chdir: /opt/hermes
-      tags: hermes
-
-    # ── Hermes nightly backup ──────────────────────────────────────────────
-    # `hermes backup --quick` snapshots config + state.db + auth + cron into
-    # /opt/data/state-snapshots/<timestamp>-<label>/. State.db is where
-    # memories and sessions live, so this is the only thing that captures
-    # hermes' evolving knowledge coherently. Retain last 14 nightlies; other
-    # labels (pre-deploy, manual) are left alone.
-
-    - name: Install hermes-backup script
-      copy:
-        dest: /usr/local/bin/hermes-backup
-        owner: root
-        group: root
-        mode: '0755'
-        content: |
-          #!/bin/bash
-          set -euo pipefail
-          LABEL="nightly-$(date -u +%Y%m%d)"
-          docker exec -u hermes hermes bash -c "source /opt/hermes/.venv/bin/activate && /opt/hermes/hermes backup --quick --label \"$LABEL\""
-          docker exec -u hermes hermes bash -c "cd /opt/data/state-snapshots && ls -1d *-nightly-* 2>/dev/null | sort | head -n -14 | xargs -r rm -rf"
-      tags: hermes
-
-    - name: Install hermes-backup systemd service
-      copy:
-        dest: /etc/systemd/system/hermes-backup.service
-        owner: root
-        group: root
-        mode: '0644'
-        content: |
-          [Unit]
-          Description=Nightly Hermes state snapshot
-          After=docker.service
-          Requires=docker.service
-
-          [Service]
-          Type=oneshot
-          ExecStart=/usr/local/bin/hermes-backup
-      tags: hermes
-
-    - name: Install hermes-backup systemd timer
-      copy:
-        dest: /etc/systemd/system/hermes-backup.timer
-        owner: root
-        group: root
-        mode: '0644'
-        content: |
-          [Unit]
-          Description=Nightly Hermes state snapshot
-
-          [Timer]
-          OnCalendar=*-*-* 18:00:00
-          Persistent=true
-
-          [Install]
-          WantedBy=timers.target
-      tags: hermes
-
-    - name: Enable and start hermes-backup timer
-      systemd:
-        name: hermes-backup.timer
-        enabled: true
-        state: started
-        daemon_reload: true
-      tags: hermes
 
     # ── Calibre (calibre-web + kobodl + MCP server) ──────────────────────
 
@@ -868,7 +675,6 @@
       loop:
         - /opt/miniflux
         - /opt/obsidian
-        - /opt/hermes
         - /opt/calibre
         - /opt/koinsight
         - /opt/wallabag
@@ -885,18 +691,13 @@
         mode: '0755'
         content: |
           {% raw %}#!/usr/bin/env python3
-          # Unified coloured tail for monotrope services.
-          # Reads journald (for Caddy, GoatCounter, and all container stdout)
-          # plus Hermes's internal log files (gateway.log, agent.log) which
-          # are written inside the container, not to stdout.
-          import json, os, re, subprocess, sys, threading
+          # Unified coloured tail for monotrope services on the VPS.
+          # Reads journald (for Caddy, GoatCounter, and all container stdout).
+          import json, os, re, subprocess, sys
 
           COLORS = {
               "caddy":        "\033[36m",
               "goatcounter":  "\033[35m",
-              "hermes-gw":    "\033[93m",
-              "hermes-agent": "\033[33m",
-              "hermes":       "\033[33m",
               "miniflux":     "\033[32m",
               "calibre":      "\033[31m",
               "koinsight":    "\033[37m",
@@ -904,24 +705,11 @@
           }
           RESET = "\033[0m"
           ANSI = re.compile(r"\x1b\[[0-9;]*m")
-          lock = threading.Lock()
 
           def emit(svc, msg):
               key = next((k for k in COLORS if svc.startswith(k)), None)
               color = COLORS.get(key, "\033[90m")
-              with lock:
-                  print(f"{color}[{svc:<13}]{RESET} {ANSI.sub('', msg)}", flush=True)
-
-          def hermes_data_path():
-              try:
-                  out = subprocess.check_output(
-                      ["docker", "inspect", "hermes", "-f",
-                       '{{range .Mounts}}{{if eq .Destination "/opt/data"}}{{.Source}}{{end}}{{end}}'],
-                      text=True, stderr=subprocess.DEVNULL,
-                  ).strip()
-                  return out or None
-              except Exception:
-                  return None
+              print(f"{color}[{svc:<13}]{RESET} {ANSI.sub('', msg)}", flush=True)
 
           def tail_journal(extra):
               filters = ["_SYSTEMD_UNIT=caddy.service", "+", "_SYSTEMD_UNIT=goatcounter.service"]
@@ -947,31 +735,10 @@
                       msg = bytes(msg).decode("utf-8", "replace")
                   emit(svc, msg)
 
-          def tail_file(path, svc):
-              if not path or not os.path.isfile(path):
-                  emit("mlogs", f"skipping {svc}: {path} not found")
-                  return
-              p = subprocess.Popen(
-                  ["tail", "-F", "-n", "0", path],
-                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
-              )
-              for line in p.stdout:
-                  emit(svc, line.rstrip("\n"))
-
           def main():
               extra = sys.argv[1:]
-              threads = [threading.Thread(target=tail_journal, args=(extra,), daemon=True)]
-              hd = hermes_data_path()
-              if hd:
-                  for rel, svc in [("logs/gateway.log", "hermes-gw"),
-                                   ("logs/agent.log",   "hermes-agent")]:
-                      threads.append(threading.Thread(
-                          target=tail_file, args=(os.path.join(hd, rel), svc), daemon=True))
-              for t in threads:
-                  t.start()
               try:
-                  for t in threads:
-                      t.join()
+                  tail_journal(extra)
               except KeyboardInterrupt:
                   pass
 
@@ -1065,11 +832,6 @@
       systemd:
         name: fail2ban
         state: restarted
-
-    - name: Restart Hermes
-      command: docker compose restart
-      args:
-        chdir: /opt/hermes
 
     - name: Restart WireGuard
       systemd:

@@ -1,0 +1,6 @@
+#!/bin/bash
+set -euo pipefail
+LABEL="nightly-$(date -u +%Y%m%d)"
+HERMES_HOME={{ hermes_home }} /usr/local/bin/hermes backup --quick --label "$LABEL"
+cd {{ hermes_home }}/state-snapshots
+ls -1d *-nightly-* 2>/dev/null | sort | head -n -14 | xargs -r rm -rf

@@ -1,0 +1,219 @@
+---
+# Native (non-Docker) Hermes Agent install. The LXC itself is the sandbox —
+# Hermes runs under systemd, gets to apt install / write anywhere within the
+# container's filesystem, and is firewalled at the Proxmox level rather than
+# at a docker-network boundary.
+#
+# State (auth tokens, sessions, memories, state.db, evolved skills) lives in
+# {{ hermes_home }}, owned by the hermes user. The first deploy expects an
+# rsync of /opt/data from the VPS docker volume to land here before the
+# service starts; see project_homelab_progress.md.
+
+- name: Install runtime dependencies
+  ansible.builtin.apt:
+    name:
+      - build-essential   # for any C extensions in the venv
+      - ca-certificates
+      - curl
+      - ffmpeg            # TTS / audio handling
+      - git
+      - python3
+      - python3-venv
+      - ripgrep           # skill search
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install uv
+  ansible.builtin.shell: |
+    set -euo pipefail
+    curl -LsSf https://astral.sh/uv/install.sh \
+      | env UV_INSTALL_DIR=/usr/local/bin UV_NO_MODIFY_PATH=1 sh
+  args:
+    creates: /usr/local/bin/uv
+    executable: /bin/bash
+
+- name: Ensure hermes group with stable GID
+  ansible.builtin.group:
+    name: "{{ hermes_user }}"
+    gid: "{{ hermes_gid }}"
+    state: present
+
+- name: Ensure hermes user with stable UID
+  ansible.builtin.user:
+    name: "{{ hermes_user }}"
+    uid: "{{ hermes_uid }}"
+    group: "{{ hermes_user }}"
+    home: "{{ hermes_home }}"
+    shell: /bin/bash
+    create_home: false
+    state: present
+
+- name: Ensure HERMES_HOME exists
+  ansible.builtin.file:
+    path: "{{ hermes_home }}"
+    state: directory
+    owner: "{{ hermes_user }}"
+    group: "{{ hermes_user }}"
+    mode: '0750'
+
+- name: Clone hermes-agent at pinned ref
+  ansible.builtin.git:
+    repo: "{{ hermes_repo_url }}"
+    dest: "{{ hermes_install_dir }}"
+    version: "{{ hermes_version }}"
+    force: true
+  notify: Restart hermes-gateway
+  register: hermes_repo
+
+- name: Create venv via uv
+  ansible.builtin.command: uv venv --python 3.11 .venv
+  args:
+    chdir: "{{ hermes_install_dir }}"
+    creates: "{{ hermes_install_dir }}/.venv/bin/python"
+
+- name: Install hermes-agent into venv (editable, all extras)
+  ansible.builtin.command: uv pip install -e ".[all]"
+  args:
+    chdir: "{{ hermes_install_dir }}"
+  environment:
+    VIRTUAL_ENV: "{{ hermes_install_dir }}/.venv"
+  when: hermes_repo.changed
+  notify: Restart hermes-gateway
+
+- name: Symlink hermes binary to /usr/local/bin
+  ansible.builtin.file:
+    src: "{{ hermes_install_dir }}/.venv/bin/hermes"
+    dest: /usr/local/bin/hermes
+    state: link
+    force: true
+
+- name: Stage config.yaml
+  ansible.builtin.copy:
+    src: config.yaml
+    dest: "{{ hermes_home }}/config.yaml"
+    owner: "{{ hermes_user }}"
+    group: "{{ hermes_user }}"
+    mode: '0640'
+  notify: Restart hermes-gateway
+
+- name: Stage plugins directory
+  ansible.builtin.copy:
+    src: plugins/
+    dest: "{{ hermes_home }}/plugins/"
+    owner: "{{ hermes_user }}"
+    group: "{{ hermes_user }}"
+    mode: '0640'
+    directory_mode: '0750'
+  notify: Restart hermes-gateway
+
+- name: Write Miniflux plugin config
+  ansible.builtin.copy:
+    dest: "{{ hermes_home }}/plugins/miniflux/config.json"
+    owner: "{{ hermes_user }}"
+    group: "{{ hermes_user }}"
+    mode: '0600'
+    content: |
+      {
+        "base_url": "{{ hermes_miniflux_url }}",
+        "api_key": "{{ hermes_miniflux_api_key }}"
+      }
+  no_log: true
+  notify: Restart hermes-gateway
+
+# Authored skills ("seeds") live in the repo. Hermes owns its evolved copies
+# in {{ hermes_home }}/skills; we copy seeds in no-clobber so deploys never
+# overwrite agent-modified skills. For fresh installs this plants the seeds
+# before first boot; for existing installs it only adds new seed files.
+- name: Stage seed skills
+  ansible.builtin.copy:
+    src: seeds/
+    dest: /opt/hermes-seeds/
+    owner: "{{ hermes_user }}"
+    group: "{{ hermes_user }}"
+    mode: '0644'
+    directory_mode: '0755'
+
+- name: Ensure skills directory exists
+  ansible.builtin.file:
+    path: "{{ hermes_home }}/skills"
+    state: directory
+    owner: "{{ hermes_user }}"
+    group: "{{ hermes_user }}"
+    mode: '0750'
+
+- name: Plant seed skills (no-clobber)
+  ansible.builtin.command: cp -rn /opt/hermes-seeds/. {{ hermes_home }}/skills/
+  changed_when: false
+
+- name: Reown skills directory tree
+  ansible.builtin.file:
+    path: "{{ hermes_home }}/skills"
+    owner: "{{ hermes_user }}"
+    group: "{{ hermes_user }}"
+    recurse: true
+
+- name: Write gateway environment file
+  ansible.builtin.template:
+    src: hermes-gateway.env.j2
+    dest: /etc/default/hermes-gateway
+    owner: root
+    group: "{{ hermes_user }}"
+    mode: '0640'
+  no_log: true
+  notify: Restart hermes-gateway
+
+- name: Install hermes-gateway systemd unit
+  ansible.builtin.template:
+    src: hermes-gateway.service.j2
+    dest: /etc/systemd/system/hermes-gateway.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Reload systemd
+    - Restart hermes-gateway
+
+- name: Enable hermes-gateway
+  ansible.builtin.systemd:
+    name: hermes-gateway
+    enabled: true
+    daemon_reload: true
+
+# ── Nightly state snapshot ─────────────────────────────────────────────────
+# `hermes backup --quick` snapshots config + state.db + auth + cron into
+# {{ hermes_home }}/state-snapshots/<timestamp>-<label>/. State.db carries
+# memories and sessions, so this is the only thing that captures hermes'
+# evolving knowledge coherently. Retain last 14 nightlies; other labels
+# (pre-deploy, manual) are left alone.
+
+- name: Install hermes-backup script
+  ansible.builtin.template:
+    src: hermes-backup.sh.j2
+    dest: /usr/local/bin/hermes-backup
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install hermes-backup systemd unit
+  ansible.builtin.template:
+    src: hermes-backup.service.j2
+    dest: /etc/systemd/system/hermes-backup.service
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Install hermes-backup systemd timer
+  ansible.builtin.template:
+    src: hermes-backup.timer.j2
+    dest: /etc/systemd/system/hermes-backup.timer
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Enable hermes-backup timer
+  ansible.builtin.systemd:
+    name: hermes-backup.timer
+    enabled: true
+    state: started
+    daemon_reload: true

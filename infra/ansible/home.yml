@@ -36,3 +36,9 @@
     - calibre_web
     - audiobookshelf
     - koinsight
+
+- name: Provision hermes LXC
+  hosts: hermes
+  become: true
+  roles:
+    - hermes

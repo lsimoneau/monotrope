@@ -1,4 +1,4 @@
-.PHONY: build serve deploy ssh setup infra logs miniflux goatcounter hermes hermes-sync hermes-chat hermes-cli enrich wireguard calibre calibre-sync koinsight wallabag obsidian obsidian-login backup-setup backup
+.PHONY: build serve deploy ssh setup infra logs miniflux goatcounter enrich wireguard calibre calibre-sync koinsight wallabag obsidian obsidian-login backup-setup backup
 
 DEPLOY_USER := deploy
 
@@ -54,39 +54,6 @@ obsidian-login:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
 	ssh -t root@$(MONOTROPE_HOST) docker exec -it obsidian-sync ob login --email $(OBSIDIAN_EMAIL)
 	ssh root@$(MONOTROPE_HOST) docker restart obsidian-sync
-
-hermes: hermes-sync
-	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ansible-playbook -i $(VPS_INVENTORY) infra/ansible/vps.yml --tags hermes
-
-hermes-sync:
-	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	@echo "Checking for remote config changes..."
-	@ssh root@$(MONOTROPE_HOST) docker cp hermes:/opt/data/config.yaml - 2>/dev/null | tar -xO > /tmp/hermes-remote-config.yaml || true
-	@if ! diff -q infra/hermes/config.yaml /tmp/hermes-remote-config.yaml >/dev/null 2>&1; then \
-		echo ""; \
-		echo "Remote config.yaml differs from local:"; \
-		echo "─────────────────────────────────────"; \
-		diff -u infra/hermes/config.yaml /tmp/hermes-remote-config.yaml || true; \
-		echo "─────────────────────────────────────"; \
-		echo ""; \
-		read -p "Overwrite remote with local? [y/N] " ans; \
-		if [ "$$ans" != "y" ] && [ "$$ans" != "Y" ]; then \
-			echo "Aborting. Merge remote changes into infra/hermes/config.yaml first."; \
-			exit 1; \
-		fi; \
-	else \
-		echo "Config in sync."; \
-	fi
-
-hermes-chat:
-	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ssh -t root@$(MONOTROPE_HOST) "docker exec -it -u 10000 hermes bash -c '. /opt/hermes/.venv/bin/activate && hermes chat'"
-
-hermes-cli:
-	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
-	ssh -t root@$(MONOTROPE_HOST) "docker exec -it -u 10000 hermes bash -c '. /opt/hermes/.venv/bin/activate && hermes $(ARGS)'"
-
 
 wireguard:
 	@test -n "$(MONOTROPE_HOST)" || (echo "Error: MONOTROPE_HOST is not set"; exit 1)
