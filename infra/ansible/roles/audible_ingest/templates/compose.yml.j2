@@ -1,0 +1,21 @@
+services:
+  audible-ingest:
+    image: {{ audible_ingest_image }}
+    pull_policy: never
+    restart: unless-stopped
+    user: "{{ audible_ingest_puid }}:{{ audible_ingest_pgid }}"
+    volumes:
+      - audible_config:/var/lib/audible-cli
+      - audible_state:/var/lib/audible-ingest
+      - {{ audible_ingest_audiobooks_path }}:/audiobooks
+    environment:
+      TZ: "{{ audible_ingest_tz }}"
+      AUDIBLE_CONFIG_DIR: /var/lib/audible-cli
+    # Long-running so the timer can `docker exec` daily without paying
+    # container-start overhead per sweep, and so first-time `audible
+    # quickstart` can be run interactively in the same shell.
+    command: ["tail", "-f", "/dev/null"]
+
+volumes:
+  audible_config:
+  audible_state:

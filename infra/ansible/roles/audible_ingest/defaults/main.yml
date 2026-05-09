@@ -1,0 +1,19 @@
+---
+audible_ingest_dir: /opt/audible-ingest
+audible_ingest_tz: Australia/Sydney
+audible_ingest_image: audible-ingest:latest
+audible_ingest_audiobooks_path: /library/audiobooks
+# Match the audiobookshelf NAS user so files written into /audiobooks
+# show up as homelab:homelab on the NAS, and so the audible-cli config
+# directory (in a named volume) is owned by the same UID across runs.
+audible_ingest_puid: 1028
+audible_ingest_pgid: 1028
+audible_ingest_marketplace: AU
+# Daily sweep — same cadence as kobo-ingest.
+audible_ingest_oncalendar: "*-*-* 06:30:00"
+# Drip-feed caps. With ~25/day, a 200-book initial library catches up in
+# ~8 days; once steady-state, new purchases are 1-2/run and the cap is
+# irrelevant. Sleep is jittered uniformly between min and max.
+audible_ingest_max_per_run: 25
+audible_ingest_sleep_min: 30
+audible_ingest_sleep_max: 90

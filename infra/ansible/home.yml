@@ -35,6 +35,7 @@
     - docker
     - calibre_web
     - audiobookshelf
+    - audible_ingest
     - koinsight
     - miniflux
 

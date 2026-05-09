@@ -1,0 +1,12 @@
+[Unit]
+Description=Audible→Audiobookshelf ingestion sweep
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker exec \
+  -e MAX_PER_RUN={{ audible_ingest_max_per_run }} \
+  -e SLEEP_MIN={{ audible_ingest_sleep_min }} \
+  -e SLEEP_MAX={{ audible_ingest_sleep_max }} \
+  audible-ingest-audible-ingest-1 /usr/local/bin/audible-ingest

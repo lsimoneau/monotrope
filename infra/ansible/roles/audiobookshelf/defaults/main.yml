@@ -4,3 +4,7 @@ audiobookshelf_tz: Australia/Sydney
 audiobookshelf_port: 13378
 audiobookshelf_audiobooks_path: /library/audiobooks
 audiobookshelf_image: ghcr.io/advplyr/audiobookshelf:latest
+# Run ABS as the NAS `homelab` user so it can read /audiobooks over NFS.
+# The official image has no PUID/PGID support, but compose's `user:` works.
+audiobookshelf_puid: 1028
+audiobookshelf_pgid: 1028

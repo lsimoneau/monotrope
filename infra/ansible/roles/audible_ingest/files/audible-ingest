@@ -1,0 +1,180 @@
+#!/usr/bin/env python3
+"""Audible→Audiobookshelf ingestion sweep.
+
+Lists Audible library via audible-cli, matches against per-book folders in
+/audiobooks, and downloads + decrypts anything missing. State is keyed by
+ASIN so the loop is idempotent across runs.
+
+Layout: /audiobooks/<Author>/<Title>/<Title>.m4b — multi-part titles drop
+multiple .m4b files into the same folder (no concatenation).
+
+Runs inside the audible-ingest container; a host-side systemd timer fires
+`docker exec` daily.
+"""
+import json
+import os
+import random
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+import unicodedata
+from pathlib import Path
+
+LIBRARY = Path("/audiobooks")
+STATE_DIR = Path("/var/lib/audible-ingest")
+STATE = STATE_DIR / "state.json"
+
+TERMINAL = {"imported", "pinned"}
+ILLEGAL_FS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+# Inter-download throttle. Jitter (uniform between SLEEP_MIN and SLEEP_MAX)
+# avoids the perfectly-cadenced fingerprint of a script. MAX_PER_RUN caps
+# how many new downloads a single sweep does — drip-feed via the timer to
+# keep first-run bulk imports under any plausible rate-limit threshold.
+SLEEP_MIN = int(os.environ.get("SLEEP_MIN", "30"))
+SLEEP_MAX = int(os.environ.get("SLEEP_MAX", "90"))
+MAX_PER_RUN = int(os.environ["MAX_PER_RUN"]) if os.environ.get("MAX_PER_RUN") else None
+
+
+def safe_name(s: str) -> str:
+    s = unicodedata.normalize("NFKC", s)
+    s = ILLEGAL_FS.sub("", s).strip().rstrip(".")
+    return re.sub(r"\s+", " ", s)
+
+
+def audible_library() -> list[dict]:
+    with tempfile.NamedTemporaryFile("r+", suffix=".json", delete=False) as tf:
+        path = tf.name
+    try:
+        subprocess.run(
+            ["audible", "library", "export", "--format", "json", "--output", path],
+            check=True, stdout=subprocess.DEVNULL,
+        )
+        return json.loads(Path(path).read_text())
+    finally:
+        Path(path).unlink(missing_ok=True)
+
+
+def first_author(item: dict) -> str:
+    # `audible library export --format json` returns authors as a comma-
+    # separated string, not a list. Split on ", " and take the first name.
+    authors = item.get("authors")
+    if not authors:
+        return "Unknown Author"
+    if isinstance(authors, str):
+        first = authors.split(", ", 1)[0].strip()
+        return first or "Unknown Author"
+    if isinstance(authors, list) and authors:
+        a = authors[0]
+        if isinstance(a, dict):
+            return (a.get("name") or "Unknown Author").strip()
+        return str(a).strip() or "Unknown Author"
+    return "Unknown Author"
+
+
+def book_folder(author: str, title: str) -> Path:
+    return LIBRARY / safe_name(author) / safe_name(title)
+
+
+def already_have(folder: Path) -> bool:
+    return folder.is_dir() and any(folder.glob("*.m4b"))
+
+
+def decrypt_aaxc(aaxc: Path, voucher: Path, out: Path) -> None:
+    v = json.loads(voucher.read_text())
+    lr = v["content_license"]["license_response"]
+    key, iv = lr["key"], lr["iv"]
+    subprocess.run(
+        ["ffmpeg", "-y", "-loglevel", "error",
+         "-audible_key", key, "-audible_iv", iv,
+         "-i", str(aaxc), "-c", "copy", str(out)],
+        check=True,
+    )
+
+
+def download_and_decrypt(asin: str, folder: Path) -> int:
+    folder.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        ["audible", "download",
+         "--asin", asin,
+         "--aaxc",
+         "--output-dir", str(folder),
+         "--ignore-errors", "--no-confirm",
+         "--filename-mode", "ascii"],
+        check=True,
+    )
+    aaxc_files = sorted(folder.glob("*.aaxc"))
+    if not aaxc_files:
+        raise RuntimeError(f"no .aaxc downloaded for {asin}")
+    decrypted = 0
+    for aaxc in aaxc_files:
+        voucher = aaxc.with_suffix(".voucher")
+        if not voucher.exists():
+            print(f"WARN: missing voucher for {aaxc.name}", file=sys.stderr)
+            continue
+        m4b = aaxc.with_suffix(".m4b")
+        decrypt_aaxc(aaxc, voucher, m4b)
+        aaxc.unlink()
+        voucher.unlink()
+        decrypted += 1
+    if decrypted == 0:
+        raise RuntimeError(f"no parts decrypted for {asin}")
+    return decrypted
+
+
+def main() -> int:
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    state = json.loads(STATE.read_text()) if STATE.exists() else {}
+
+    library = audible_library()
+    counts = dict(downloaded=0, already=0, errors=0)
+
+    for item in library:
+        asin = item.get("asin")
+        title = item.get("title") or ""
+        if not asin or not title:
+            continue
+        author = first_author(item)
+        folder = book_folder(author, title)
+
+        if state.get(asin, {}).get("status") in TERMINAL and already_have(folder):
+            continue
+
+        if already_have(folder):
+            state[asin] = {"status": "imported", "title": title, "author": author}
+            counts["already"] += 1
+            continue
+
+        if MAX_PER_RUN is not None and counts["downloaded"] >= MAX_PER_RUN:
+            print(f"hit MAX_PER_RUN={MAX_PER_RUN}, stopping sweep early",
+                  file=sys.stderr)
+            break
+        try:
+            parts = download_and_decrypt(asin, folder)
+            state[asin] = {
+                "status": "imported", "title": title, "author": author,
+                "parts": parts, "downloaded_at": int(time.time()),
+            }
+            counts["downloaded"] += 1
+            time.sleep(random.uniform(SLEEP_MIN, SLEEP_MAX))
+        except (subprocess.CalledProcessError, RuntimeError) as e:
+            counts["errors"] += 1
+            print(f"ERROR: {asin} {title!r}: {e}", file=sys.stderr)
+            # Leave partial residue in folder so the next sweep can see what
+            # got through; clean up only if the folder is fully empty.
+            if folder.is_dir() and not any(folder.iterdir()):
+                shutil.rmtree(folder)
+
+    tmp = STATE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(state, indent=2, sort_keys=True))
+    tmp.replace(STATE)
+
+    print(" ".join(f"{k}={v}" for k, v in counts.items()))
+    return 1 if counts["errors"] else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

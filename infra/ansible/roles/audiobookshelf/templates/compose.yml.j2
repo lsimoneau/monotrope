@@ -2,6 +2,7 @@ services:
   audiobookshelf:
     image: {{ audiobookshelf_image }}
     restart: unless-stopped
+    user: "{{ audiobookshelf_puid }}:{{ audiobookshelf_pgid }}"
     ports:
       - "{{ audiobookshelf_port }}:80"
     volumes:

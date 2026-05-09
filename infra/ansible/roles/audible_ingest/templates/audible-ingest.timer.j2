@@ -1,0 +1,9 @@
+[Unit]
+Description=Audible→Audiobookshelf ingestion sweep
+
+[Timer]
+OnCalendar={{ audible_ingest_oncalendar }}
+Persistent=true
+
+[Install]
+WantedBy=timers.target

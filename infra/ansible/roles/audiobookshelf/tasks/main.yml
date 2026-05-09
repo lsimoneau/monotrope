@@ -3,6 +3,12 @@
 # {{ audiobookshelf_audiobooks_path }}; per-user progress and library
 # metadata live in named docker volumes. Greenfield install — no
 # restore from the old droplet (ABS wasn't deployed there).
+#
+# The container runs as {{ audiobookshelf_puid }}:{{ audiobookshelf_pgid }}
+# (the NAS `homelab` user) so it can read /audiobooks over NFS — root in
+# the unprivileged LXC squashes to nobody on the NAS. The named volumes
+# /config and /metadata start owned by root:root, so they need a chown
+# before the container can write.
 
 - name: Ensure audiobookshelf directory
   ansible.builtin.file:
@@ -20,6 +26,25 @@
     group: root
     mode: '0644'
   register: audiobookshelf_compose
+
+- name: Stop audiobookshelf before chown if compose changed
+  ansible.builtin.command:
+    cmd: docker compose stop
+    chdir: "{{ audiobookshelf_dir }}"
+  when: audiobookshelf_compose.changed
+  failed_when: false
+  changed_when: true
+
+- name: Chown audiobookshelf volumes to runtime UID/GID
+  ansible.builtin.command:
+    cmd: >-
+      docker run --rm
+      -v audiobookshelf_config:/config
+      -v audiobookshelf_metadata:/metadata
+      alpine:latest
+      chown -R {{ audiobookshelf_puid }}:{{ audiobookshelf_pgid }} /config /metadata
+  when: audiobookshelf_compose.changed
+  changed_when: true
 
 - name: Bring up audiobookshelf
   ansible.builtin.command:
