@@ -1,0 +1,170 @@
+#!/usr/bin/env python3
+"""Kobo→calibre ingestion sweep.
+
+Lists Kobo entitlements via kobodl, matches them against the local calibre
+library, and downloads anything missing into CWA's ingest folder. State is
+keyed by RevisionId so the loop is idempotent across runs.
+
+Runs inside the calibre-web container; a host-side systemd timer fires
+`docker exec` daily.
+"""
+import json
+import re
+import subprocess
+import sys
+import tempfile
+import time
+import unicodedata
+from pathlib import Path
+
+LIBRARY = "/calibre-library"
+INGEST = Path("/cwa-book-ingest")
+STATE_DIR = Path("/var/lib/kobo-ingest")
+STATE = STATE_DIR / "state.json"
+PINNED = STATE_DIR / "pinned.json"
+
+TERMINAL = {"imported", "pinned", "removed_at_source"}
+HONORIFICS = re.compile(r"(jr|sr|phd|md|ii|iii|iv|dr)\.?", re.I)
+
+
+def norm(s: str) -> str:
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    s = re.sub(r"[‘’']", "", s.lower())
+    return re.sub(r"[^a-z0-9]+", " ", s).strip()
+
+
+def main_title(t: str) -> str:
+    return t.split(": ", 1)[0]
+
+
+def author_surname(a: str) -> str:
+    first = a.split(",")[0].split("&")[0].strip()
+    parts = [p for p in first.split() if not HONORIFICS.fullmatch(p)]
+    return norm(parts[-1]) if parts else ""
+
+
+def kobodl_export() -> list:
+    with tempfile.NamedTemporaryFile("r+", suffix=".json") as tf:
+        subprocess.run(
+            ["kobodl", "book", "list", "--export-library", tf.name],
+            check=True, stdout=subprocess.DEVNULL,
+        )
+        tf.seek(0)
+        return json.load(tf)
+
+
+def calibredb_list() -> list:
+    p = subprocess.run(
+        ["calibredb", "list", "--library-path", LIBRARY,
+         "--fields=id,title,authors", "--for-machine", "--limit", "10000"],
+        capture_output=True, text=True, check=True,
+    )
+    cleaned = "\n".join(
+        line for line in p.stdout.splitlines() if "No write access" not in line
+    ).rstrip()
+    if not cleaned.endswith("]"):
+        cleaned += "\n]"
+    return json.loads(cleaned)
+
+
+def find_match(title: str, author: str, calibre: list) -> list:
+    kt_full = norm(title)
+    kt_main = norm(main_title(title))
+    ksur = author_surname(author)
+    exact, sub = [], []
+    for c in calibre:
+        ct = norm(c["title"])
+        csur = author_surname(c.get("authors", ""))
+        if csur != ksur:
+            continue
+        if ct == kt_full or ct == kt_main:
+            exact.append(c)
+        elif kt_main and ct and (kt_main in ct or ct in kt_main):
+            sub.append(c)
+    return exact if exact else sub
+
+
+def download(rev: str) -> None:
+    subprocess.run(
+        ["kobodl", "book", "get", rev, "--output-dir", str(INGEST)],
+        check=True,
+    )
+
+
+def main() -> int:
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    state = json.loads(STATE.read_text()) if STATE.exists() else {}
+
+    if PINNED.exists():
+        for rev, info in json.loads(PINNED.read_text()).items():
+            if state.get(rev, {}).get("status") not in TERMINAL:
+                state[rev] = {"status": "pinned", **info}
+
+    library = kobodl_export()
+    calibre = calibredb_list()
+
+    counts = dict(downloaded=0, imported=0, already=0, removed=0,
+                  pending=0, multi=0, errors=0)
+
+    for entry in library:
+        if "NewEntitlement" not in entry:
+            continue
+        ent = entry["NewEntitlement"]["BookEntitlement"]
+        meta = entry["NewEntitlement"]["BookMetadata"]
+        rev = meta["RevisionId"]
+        title = meta.get("Title", "")
+        crs = meta.get("ContributorRoles") or []
+        author = crs[0]["Name"] if crs else ""
+
+        if ent.get("IsRemoved"):
+            if state.get(rev, {}).get("status") != "removed_at_source":
+                state[rev] = {"status": "removed_at_source", "title": title}
+                counts["removed"] += 1
+            continue
+
+        cur = state.get(rev, {}).get("status")
+        if cur in TERMINAL:
+            continue
+
+        hits = find_match(title, author, calibre)
+        if len(hits) == 1:
+            state[rev] = {"status": "imported", "title": title,
+                          "calibre_id": hits[0]["id"]}
+            counts["imported" if cur == "downloaded" else "already"] += 1
+            continue
+        if len(hits) > 1:
+            state[rev] = {"status": "multi_match", "title": title,
+                          "candidates": [h["id"] for h in hits]}
+            counts["multi"] += 1
+            print(f"MULTI: {rev} {title!r} -> {[h['id'] for h in hits]}",
+                  file=sys.stderr)
+            continue
+
+        if cur == "downloaded":
+            counts["pending"] += 1
+            age_h = (time.time() - state[rev].get("downloaded_at", 0)) / 3600
+            if age_h > 24:
+                print(f"STALE: {rev} {title!r} downloaded {age_h:.0f}h ago, "
+                      f"still not in calibre", file=sys.stderr)
+            continue
+
+        try:
+            download(rev)
+            state[rev] = {"status": "downloaded", "title": title,
+                          "downloaded_at": int(time.time())}
+            counts["downloaded"] += 1
+        except subprocess.CalledProcessError as e:
+            counts["errors"] += 1
+            print(f"ERROR: {rev} {title!r}: {e}", file=sys.stderr)
+
+    tmp = STATE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(state, indent=2, sort_keys=True))
+    tmp.replace(STATE)
+
+    print(" ".join(f"{k}={v}" for k, v in counts.items()))
+    return 1 if counts["errors"] else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

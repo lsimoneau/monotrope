@@ -1,0 +1,8 @@
+[Unit]
+Description=Kobo→calibre ingestion sweep
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker exec -u {{ calibre_web_puid }}:{{ calibre_web_pgid }} calibre-calibre-web-1 /usr/local/bin/kobo-ingest

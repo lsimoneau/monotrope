@@ -1,0 +1,12 @@
+{
+  "b60cd4e5-e2ef-44ca-a8dd-74849650d7bd": {
+    "calibre_id": 30,
+    "title": "How to Win Friends and Influence People",
+    "note": "Calibre record id=30 has mangled title (`Dale Carnegie_How to Win Friends and Influence People2`) and author (`Biblioteka`); pinned so the cron stops trying to re-download."
+  },
+  "28310fe1-ce70-416c-a8e0-87a9f566cbe3": {
+    "calibre_id": 59,
+    "title": "Meditations: A New Translation",
+    "note": "Calibre record id=59 has title and author fields swapped; pinned so the cron stops trying to re-download."
+  }
+}

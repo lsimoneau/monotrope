@@ -33,11 +33,29 @@
     mode: '0644'
   register: calibre_web_dockerfile
 
+- name: Sync kobo-ingest script to build context
+  ansible.builtin.copy:
+    src: kobo-ingest
+    dest: "{{ calibre_web_dir }}/build/kobo-ingest"
+    owner: root
+    group: root
+    mode: '0755'
+  register: calibre_web_kobo_ingest_script
+
+- name: Sync kobo-ingest pinned-revisions file to build context
+  ansible.builtin.copy:
+    src: pinned.json
+    dest: "{{ calibre_web_dir }}/build/pinned.json"
+    owner: root
+    group: root
+    mode: '0644'
+  register: calibre_web_kobo_pinned
+
 - name: Build calibre-web image
   ansible.builtin.command:
     cmd: docker build -t {{ calibre_web_image }} .
     chdir: "{{ calibre_web_dir }}/build"
-  when: calibre_web_dockerfile.changed
+  when: calibre_web_dockerfile.changed or calibre_web_kobo_ingest_script.changed
   register: calibre_web_build
   changed_when: true
 
@@ -66,3 +84,50 @@
     chdir: "{{ calibre_web_dir }}"
   when: calibre_web_compose.changed or calibre_web_build.changed
   changed_when: true
+
+# Seed pinned.json into the named state volume on every run. The volume
+# persists across image rebuilds, so changes to pinned.json wouldn't
+# otherwise propagate. Cheap to re-copy unconditionally.
+- name: Seed pinned.json into kobo state volume
+  ansible.builtin.command:
+    cmd: docker cp pinned.json calibre-calibre-web-1:/var/lib/kobo-ingest/pinned.json
+    chdir: "{{ calibre_web_dir }}/build"
+  changed_when: false
+
+# linuxserver's PUID/PGID remap doesn't touch paths it doesn't know about,
+# so /var/lib/kobo-ingest and /var/lib/kobodl keep the build-time UID (or
+# whatever was written into the named volume earlier). Re-chown to the
+# runtime PUID/PGID so the script — invoked via `docker exec -u` — can
+# read the kobodl config and write ingestion state.
+- name: Chown kobo state + kobodl config to runtime PUID/PGID
+  ansible.builtin.command:
+    cmd: >-
+      docker exec --user root calibre-calibre-web-1
+      chown -R {{ calibre_web_puid }}:{{ calibre_web_pgid }}
+      /var/lib/kobo-ingest /var/lib/kobodl
+  changed_when: false
+
+- name: Install kobo-ingest systemd service
+  ansible.builtin.template:
+    src: kobo-ingest.service.j2
+    dest: /etc/systemd/system/kobo-ingest.service
+    owner: root
+    group: root
+    mode: '0644'
+  register: kobo_ingest_service
+
+- name: Install kobo-ingest systemd timer
+  ansible.builtin.template:
+    src: kobo-ingest.timer.j2
+    dest: /etc/systemd/system/kobo-ingest.timer
+    owner: root
+    group: root
+    mode: '0644'
+  register: kobo_ingest_timer
+
+- name: Enable kobo-ingest timer
+  ansible.builtin.systemd:
+    name: kobo-ingest.timer
+    enabled: true
+    state: started
+    daemon_reload: true

@@ -7,7 +7,9 @@ services:
       - "{{ calibre_web_port }}:8083"
     volumes:
       - calibre_config:/config
-      - kobodl_config:/root/.config/kobodl
+      - kobodl_config:/var/lib/kobodl
+      - cwa_ingest:/cwa-book-ingest
+      - kobo_ingest_state:/var/lib/kobo-ingest
       - {{ calibre_web_library_path }}:/calibre-library
     environment:
       PUID: "{{ calibre_web_puid }}"
@@ -17,3 +19,5 @@ services:
 volumes:
   calibre_config:
   kobodl_config:
+  cwa_ingest:
+  kobo_ingest_state:
