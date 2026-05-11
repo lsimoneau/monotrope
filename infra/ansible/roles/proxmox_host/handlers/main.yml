@@ -1,0 +1,6 @@
+---
+- name: Restart nic-tuning
+  ansible.builtin.systemd:
+    name: nic-tuning.service
+    state: restarted
+    daemon_reload: true

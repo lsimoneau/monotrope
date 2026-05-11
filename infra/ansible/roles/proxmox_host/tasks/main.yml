@@ -1,0 +1,42 @@
+---
+# Host-level config for the Proxmox node, outside of LXC creation
+# (see proxmox_lxc_config for that).
+
+# ── e1000e Hardware Unit Hang mitigation ────────────────────────────────
+# The OptiPlex 7090's onboard I219 NIC (driver e1000e) periodically wedges
+# under load — "Detected Hardware Unit Hang" in dmesg, NIC stops passing
+# traffic until a host reboot. Disabling TCP/generic segmentation offload
+# and Energy Efficient Ethernet is the well-attested workaround.
+
+- name: Install ethtool
+  ansible.builtin.apt:
+    name: ethtool
+    state: present
+
+- name: Install nic-tuning.service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/nic-tuning.service
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Apply ethtool tuning to nic0 (e1000e Hardware Unit Hang mitigation)
+      After=networking.service
+      Requires=networking.service
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/sbin/ethtool -K nic0 tso off gso off
+      ExecStart=/sbin/ethtool --set-eee nic0 eee off
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: Restart nic-tuning
+
+- name: Enable nic-tuning.service
+  ansible.builtin.systemd:
+    name: nic-tuning.service
+    enabled: true
+    daemon_reload: true

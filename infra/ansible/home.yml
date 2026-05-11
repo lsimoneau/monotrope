@@ -5,6 +5,7 @@
   hosts: proxmox_hosts
   become: true
   roles:
+    - proxmox_host
     - proxmox_lxc_config
     - caddy
 
