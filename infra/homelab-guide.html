@@ -1,0 +1,714 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monotrope Homelab — Operations Guide</title>
+<style>
+  :root {
+    --bg: #0d0f0d;
+    --panel: #13171a;
+    --panel-2: #1a1f23;
+    --ink: #c8d0bf;
+    --ink-dim: #8a9382;
+    --accent: #8fcb7a;        /* green crt */
+    --accent-2: #f0c674;      /* amber */
+    --accent-3: #82aaff;      /* link blue */
+    --danger: #e07b6a;
+    --rule: #2a3036;
+    --shadow: 0 0 0 1px var(--rule);
+    --mono: ui-monospace, "JetBrains Mono", "Fira Code", "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body {
+    margin: 0;
+    font: 14.5px/1.55 var(--mono);
+    padding: 32px 24px 96px;
+    max-width: 1200px;
+    margin-inline: auto;
+  }
+  h1, h2, h3, h4 { font-family: var(--mono); font-weight: 600; color: var(--accent); margin: 1.6em 0 .6em; }
+  h1 { font-size: 1.6rem; border-bottom: 1px solid var(--rule); padding-bottom: .3em; margin-top: 0; }
+  h2 { font-size: 1.2rem; color: var(--accent-2); margin-top: 2.2em; }
+  h3 { font-size: 1rem; color: var(--accent); }
+  h4 { font-size: .95rem; color: var(--ink); }
+  p, li { color: var(--ink); }
+  a { color: var(--accent-3); text-decoration: none; border-bottom: 1px dotted var(--accent-3); }
+  a:hover { border-bottom-style: solid; }
+  code { background: var(--panel-2); padding: 0 .35em; border-radius: 2px; color: var(--accent-2); }
+  pre {
+    background: var(--panel); border: 1px solid var(--rule); border-radius: 4px;
+    padding: 12px 14px; overflow-x: auto; font-size: 13px; line-height: 1.5;
+    color: var(--ink);
+  }
+  pre code { background: transparent; padding: 0; color: inherit; }
+  .lead { color: var(--ink-dim); font-size: .95rem; max-width: 76ch; }
+  .note { border-left: 2px solid var(--accent-2); padding: .5em .8em; background: var(--panel); color: var(--ink); margin: 1em 0; font-size: .92em; }
+  .danger { border-left-color: var(--danger); }
+  .toc { background: var(--panel); border: 1px solid var(--rule); padding: 12px 18px; border-radius: 4px; margin-bottom: 24px; }
+  .toc ul { margin: 0; padding-left: 1.2em; }
+  .toc li { margin: 2px 0; }
+  table {
+    width: 100%; border-collapse: collapse; margin: .8em 0; font-size: 13px;
+    background: var(--panel); border: 1px solid var(--rule); border-radius: 4px;
+    overflow: hidden;
+  }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { color: var(--accent-2); font-weight: 600; background: var(--panel-2); }
+  tr:last-child td { border-bottom: none; }
+  td code { white-space: nowrap; }
+
+  /* --- topology SVG --- */
+  .topo {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 16px;
+    margin: 1em 0;
+    overflow-x: auto;
+  }
+  .topo svg { display: block; max-width: 100%; height: auto; }
+
+  /* --- service grid --- */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 14px;
+    margin: 1em 0;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 14px 16px;
+  }
+  .card h4 { margin-top: 0; color: var(--accent); }
+  .card .meta { color: var(--ink-dim); font-size: 12px; margin-bottom: .6em; }
+  .card .kv { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; font-size: 12.5px; }
+  .card .kv dt { color: var(--ink-dim); }
+  .card .kv dd { margin: 0; color: var(--ink); }
+  .pill { display: inline-block; padding: 1px 6px; border-radius: 2px; font-size: 11px; background: var(--panel-2); color: var(--ink-dim); border: 1px solid var(--rule); }
+  .pill.docker { color: #6fbbe0; }
+  .pill.native { color: var(--accent-2); }
+  .pill.vm { color: #d090d0; }
+
+  ul.compact { margin: .3em 0; padding-left: 1.2em; }
+  ul.compact li { margin: 1px 0; }
+
+  hr { border: none; border-top: 1px solid var(--rule); margin: 2em 0; }
+  .small { font-size: 12px; color: var(--ink-dim); }
+  .right { text-align: right; }
+  .scroll-x { overflow-x: auto; }
+
+  details { background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; margin: .6em 0; }
+  details summary { cursor: pointer; color: var(--accent-2); }
+  details[open] summary { margin-bottom: .5em; }
+
+  /* legend */
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--ink-dim); margin-top: 8px; }
+  .legend span::before { content: "■ "; }
+  .legend .l-lan::before { color: var(--accent); }
+  .legend .l-ts::before  { color: var(--accent-2); }
+  .legend .l-nfs::before { color: var(--accent-3); }
+  .legend .l-internet::before { color: var(--danger); }
+</style>
+</head>
+<body>
+
+<h1>Monotrope Homelab — Operations Guide</h1>
+<p class="lead">
+  Where things run, how to reach them, where their state lives, and the recipes
+  you reach for when something breaks. Source of truth is the Ansible inventory;
+  this is the lookup table.
+</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ul>
+    <li><a href="#topology">Topology &amp; network map</a></li>
+    <li><a href="#hosts">Hosts &amp; reach</a> — SSH, web UIs, where each thing lives</li>
+    <li><a href="#services">Service catalogue</a> — per-service: shell, logs, state</li>
+    <li><a href="#networks">Network details</a> — LAN, Tailscale, NFS, Caddy, Docker nets</li>
+    <li><a href="#state">State &amp; persistence</a> — what's precious, what's disposable</li>
+    <li><a href="#recipes">Common recipes</a> — restart, scan, reingest, redeploy</li>
+    <li><a href="#troubleshooting">Troubleshooting cheatsheet</a></li>
+  </ul>
+</div>
+
+<!-- ====================================================== TOPOLOGY -->
+<h2 id="topology">Topology &amp; network map</h2>
+
+<p>One physical box at home (OptiPlex 7090) running Proxmox VE. Everything else is
+a guest. Public site is unrelated: it's Hugo on Cloudflare Pages.</p>
+
+<div class="topo">
+<svg viewBox="0 0 1080 580" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Homelab topology">
+  <defs>
+    <style>
+      .box   { fill: #1a1f23; stroke: #2a3036; stroke-width: 1; }
+      .pve   { fill: #13171a; stroke: #8fcb7a; stroke-width: 1.2; }
+      .vm    { fill: #1a1f23; stroke: #d090d0; stroke-width: 1; }
+      .lxc   { fill: #1a1f23; stroke: #8fcb7a; stroke-width: 1; }
+      .nas   { fill: #13171a; stroke: #82aaff; stroke-width: 1; }
+      .ext   { fill: #13171a; stroke: #e07b6a; stroke-width: 1; }
+      .t     { font: 12px ui-monospace, Menlo, monospace; fill: #c8d0bf; }
+      .tm    { font: 600 12.5px ui-monospace, Menlo, monospace; fill: #f0c674; }
+      .tl    { font: 11px ui-monospace, Menlo, monospace; fill: #8a9382; }
+      .ts    { stroke: #f0c674; stroke-width: 1; stroke-dasharray: 4 3; fill: none; }
+      .lan   { stroke: #8fcb7a; stroke-width: 1; fill: none; }
+      .nfs   { stroke: #82aaff; stroke-width: 1; stroke-dasharray: 2 3; fill: none; }
+      .inet  { stroke: #e07b6a; stroke-width: 1; fill: none; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8a9382"/>
+    </marker>
+  </defs>
+
+  <!-- Internet/Cloudflare -->
+  <rect class="ext" x="20" y="20" width="220" height="80" rx="3"/>
+  <text class="tm" x="30" y="42">Cloudflare</text>
+  <text class="t"  x="30" y="60">monotrope.au → Pages</text>
+  <text class="tl" x="30" y="76">*.monotrope.au → tailscale IP</text>
+  <text class="tl" x="30" y="92">DNS-01 wildcard cert</text>
+
+  <!-- Tailnet -->
+  <rect class="ext" x="20" y="120" width="220" height="80" rx="3" style="stroke:#f0c674"/>
+  <text class="tm" x="30" y="142" style="fill:#f0c674">Tailnet</text>
+  <text class="tl" x="30" y="160">pve         100.88.127.39</text>
+  <text class="tl" x="30" y="176">louis-pc    100.90.65.112</text>
+  <text class="tl" x="30" y="192">s23-ultra   100.112.198.34</text>
+
+  <!-- NAS -->
+  <rect class="nas" x="20" y="240" width="220" height="80" rx="3"/>
+  <text class="tm" x="30" y="262" style="fill:#82aaff">Synology NAS</text>
+  <text class="t"  x="30" y="280">192.168.0.49</text>
+  <text class="tl" x="30" y="296">/volume1/library  (books, abs)</text>
+  <text class="tl" x="30" y="312">/volume1/media    (jellyfin, qbit)</text>
+
+  <!-- Home router -->
+  <rect class="box" x="20" y="360" width="220" height="60" rx="3"/>
+  <text class="tm" x="30" y="382">Router</text>
+  <text class="t"  x="30" y="400">192.168.0.1 — DHCP+MAC reservations</text>
+
+  <!-- PVE host -->
+  <rect class="pve" x="320" y="20" width="720" height="540" rx="6"/>
+  <text class="tm" x="340" y="46">Proxmox VE (pve)  192.168.0.59  ·  ts 100.88.127.39</text>
+  <text class="tl" x="340" y="62">Caddy on host: tls→reverse-proxy to LAN IPs · port 443 · cf-DNS-01</text>
+
+  <!-- Caddy block -->
+  <rect class="box" x="340" y="80" width="680" height="34" rx="3"/>
+  <text class="tm" x="350" y="102">Caddy (host pve)</text>
+  <text class="tl" x="500" y="102">*.monotrope.au → 192.168.0.97 / .98 / .99</text>
+
+  <!-- VM: HAOS -->
+  <rect class="vm" x="340" y="135" width="320" height="80" rx="3"/>
+  <text class="tm" x="350" y="158">VM 100 · haos</text>
+  <text class="t"  x="350" y="176">192.168.0.86 · Home Assistant</text>
+  <text class="tl" x="350" y="194">port 8123 · no Caddy front-door</text>
+  <text class="tl" x="350" y="208">SSH via HA "Terminal & SSH" add-on</text>
+
+  <!-- LXC: jellyfin -->
+  <rect class="lxc" x="340" y="230" width="320" height="80" rx="3"/>
+  <text class="tm" x="350" y="252">LXC 101 · jellyfin</text>
+  <text class="t"  x="350" y="270">192.168.0.99 · jellyfin (native)</text>
+  <text class="tl" x="350" y="286">port 8096 · NFS-RO /media</text>
+  <text class="tl" x="350" y="302">igpu passthrough for transcode</text>
+
+  <!-- LXC: media-stack -->
+  <rect class="lxc" x="340" y="325" width="320" height="120" rx="3"/>
+  <text class="tm" x="350" y="348">LXC 102 · media-stack</text>
+  <text class="t"  x="350" y="366">192.168.0.98 · docker</text>
+  <text class="tl" x="350" y="382">qbit 8080 (via gluetun/ProtonVPN)</text>
+  <text class="tl" x="350" y="396">sonarr 8989 · radarr 7878</text>
+  <text class="tl" x="350" y="410">lidarr 8686 · prowlarr 9696</text>
+  <text class="tl" x="350" y="424">NFS-RW /data (media)</text>
+  <text class="tl" x="350" y="438">qbit shares gluetun netns</text>
+
+  <!-- LXC: apps -->
+  <rect class="lxc" x="680" y="135" width="340" height="170" rx="3"/>
+  <text class="tm" x="690" y="158">LXC 103 · apps</text>
+  <text class="t"  x="690" y="176">192.168.0.97 · docker</text>
+  <text class="tl" x="690" y="192">audiobookshelf 13378 (uid 1028)</text>
+  <text class="tl" x="690" y="206">calibre-web 8083 · koinsight 3001</text>
+  <text class="tl" x="690" y="220">miniflux 8080 + postgres</text>
+  <text class="tl" x="690" y="234">audible-ingest (tail-f sidecar)</text>
+  <text class="tl" x="690" y="248">kobo-ingest (in calibre container)</text>
+  <text class="tl" x="690" y="262">NFS-RW /library</text>
+  <text class="tl" x="690" y="280">host timers: audible-ingest.timer 06:30</text>
+
+  <!-- LXC: hermes -->
+  <rect class="lxc" x="680" y="325" width="340" height="120" rx="3"/>
+  <text class="tm" x="690" y="348">LXC 104 · hermes</text>
+  <text class="t"  x="690" y="366">192.168.0.96 · native install</text>
+  <text class="tl" x="690" y="382">systemd: hermes-gateway.service</text>
+  <text class="tl" x="690" y="396">Telegram + email gateways, MCP</text>
+  <text class="tl" x="690" y="410">venv: /usr/local/lib/hermes-agent</text>
+  <text class="tl" x="690" y="424">cfg/logs: /root/.hermes, /opt/data/logs</text>
+
+  <!-- arrows -->
+  <line x1="240" y1="160" x2="320" y2="160" class="ts" marker-end="url(#arrow)"/>
+  <line x1="240" y1="60"  x2="320" y2="60"  class="inet" marker-end="url(#arrow)"/>
+  <line x1="240" y1="270" x2="500" y2="270" class="nfs" marker-end="url(#arrow)"/>
+  <line x1="240" y1="285" x2="850" y2="200" class="nfs"/>
+  <line x1="240" y1="285" x2="500" y2="395" class="nfs"/>
+  <line x1="240" y1="390" x2="320" y2="390" class="lan" marker-end="url(#arrow)"/>
+
+  <!-- legend -->
+  <text class="tl" x="340" y="555">— solid green = LAN  · — dashed amber = Tailscale  · — dashed blue = NFS  · — red = public internet</text>
+</svg>
+</div>
+
+<div class="legend">
+  <span class="l-lan">LAN 192.168.0.0/24</span>
+  <span class="l-ts">Tailnet (CGNAT 100.x)</span>
+  <span class="l-nfs">NFS v4.1 from NAS</span>
+  <span class="l-internet">Public</span>
+</div>
+
+<p>The shape of it:</p>
+<ul class="compact">
+  <li><strong>Public surface</strong> is just Cloudflare Pages serving the Hugo site. Everything else is on the tailnet — no exposed home ports.</li>
+  <li><strong>Wildcard <code>*.monotrope.au</code></strong> is a CNAME to the Proxmox host's Tailscale IP (<code>100.88.127.39</code>). Devices on the tailnet resolve and reach services through Caddy on PVE.</li>
+  <li><strong>Caddy on PVE</strong> terminates TLS (Let's Encrypt via Cloudflare DNS-01 for the wildcard) and reverse-proxies by hostname to the right LXC's port.</li>
+  <li><strong>NAS</strong> (Synology, <code>192.168.0.49</code>) holds the bulky data — books, audiobooks, media — and serves it over NFS. LXCs mount what they need.</li>
+  <li><strong>NFS identity</strong>: NAS user <code>homelab</code> = uid/gid <code>1028</code>. Every container that touches NFS runs as 1028, otherwise root squashes to nobody and reads fail.</li>
+</ul>
+
+<!-- ====================================================== HOSTS -->
+<h2 id="hosts">Hosts &amp; reach</h2>
+
+<p>SSH is by IP from your dev box. The Proxmox host has a public-key entry; the LXCs were
+seeded with the same key on creation.</p>
+
+<table>
+  <thead>
+    <tr><th>Host</th><th>Kind</th><th>LAN IP</th><th>Tailscale</th><th>SSH</th><th>Web UI</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>pve</td><td><span class="pill">Proxmox host</span></td><td><code>192.168.0.59</code></td><td><code>100.88.127.39</code></td><td><code>ssh root@192.168.0.59</code></td><td><code>https://192.168.0.59:8006</code></td></tr>
+    <tr><td>haos</td><td><span class="pill vm">VM 100</span></td><td><code>192.168.0.86</code></td><td>—</td><td>via HA "Terminal &amp; SSH" add-on</td><td><code>http://192.168.0.86:8123</code></td></tr>
+    <tr><td>jellyfin</td><td><span class="pill">LXC 101</span></td><td><code>192.168.0.99</code></td><td>—</td><td><code>ssh root@192.168.0.99</code></td><td><code>jellyfin.monotrope.au</code></td></tr>
+    <tr><td>media-stack</td><td><span class="pill">LXC 102</span></td><td><code>192.168.0.98</code></td><td>—</td><td><code>ssh root@192.168.0.98</code></td><td>per-service (qbit/sonarr/…)</td></tr>
+    <tr><td>apps</td><td><span class="pill">LXC 103</span></td><td><code>192.168.0.97</code></td><td>—</td><td><code>ssh root@192.168.0.97</code></td><td>abs / calibre / koinsight / reader</td></tr>
+    <tr><td>hermes</td><td><span class="pill">LXC 104</span></td><td><code>192.168.0.96</code></td><td>—</td><td><code>ssh root@192.168.0.96</code></td><td>— (Telegram/email gateways)</td></tr>
+  </tbody>
+</table>
+
+<p>LXC console from the Proxmox host (no SSH needed):</p>
+<pre><code># on pve:
+pct enter 103          # land inside the apps LXC as root
+pct list               # what's running
+qm list                # for VMs (Home Assistant is qm 100)
+qm terminal 100        # HAOS serial console</code></pre>
+
+<!-- ====================================================== SERVICES -->
+<h2 id="services">Service catalogue</h2>
+
+<p class="lead">
+  Every service: how to shell in, where to read its logs, where its state lives,
+  and how to restart it. Docker services live in <code>/opt/&lt;name&gt;/compose.yml</code>
+  on whichever LXC hosts them; named volumes hold the persistent state.
+</p>
+
+<div class="grid">
+
+  <!-- ABS -->
+  <div class="card">
+    <h4>Audiobookshelf <span class="pill docker">docker</span></h4>
+    <div class="meta">apps LXC · <code>192.168.0.97:13378</code> · <code>abs.monotrope.au</code></div>
+    <dl class="kv">
+      <dt>Shell</dt><dd><code>docker exec -it audiobookshelf-audiobookshelf-1 sh</code></dd>
+      <dt>Logs</dt><dd><code>docker logs --tail 200 -f audiobookshelf-audiobookshelf-1</code><br>scan logs: <code>/metadata/logs/scans/&lt;date&gt;_&lt;uuid&gt;.txt</code></dd>
+      <dt>State</dt><dd><code>audiobookshelf_config</code> (sqlite db, users, sessions)<br><code>audiobookshelf_metadata</code> (covers, scan logs, daily logs)<br>Audio: NFS <code>/library/audiobooks</code></dd>
+      <dt>Restart</dt><dd><code>cd /opt/audiobookshelf &amp;&amp; docker compose restart audiobookshelf</code></dd>
+      <dt>Force scan</dt><dd><code>curl -X POST -H "Authorization: Bearer $TOKEN" \<br>&nbsp;http://127.0.0.1:13378/audiobookshelf/api/libraries/&lt;id&gt;/scan?force=1</code></dd>
+    </dl>
+  </div>
+
+  <!-- audible-ingest -->
+  <div class="card">
+    <h4>audible-ingest <span class="pill docker">sidecar</span></h4>
+    <div class="meta">apps LXC · long-lived <code>tail -f</code> container · fired by systemd timer</div>
+    <dl class="kv">
+      <dt>Shell</dt><dd><code>docker exec -it audible-ingest-audible-ingest-1 sh</code></dd>
+      <dt>Logs</dt><dd><code>journalctl -u audible-ingest.service -f</code><br>(timer's name is <code>audible-ingest.timer</code>, daily 06:30)</dd>
+      <dt>State</dt><dd><code>audible-ingest_audible_state</code> → <code>/var/lib/audible-ingest/state.json</code> (ASIN → status)<br><code>audible-ingest_audible_config</code> → OAuth token for audible-cli</dd>
+      <dt>Run now</dt><dd><code>systemctl start audible-ingest.service</code><br>or one-shot: <code>docker exec -e MAX_PER_RUN=1 -e SLEEP_MIN=0 -e SLEEP_MAX=0 audible-ingest-audible-ingest-1 /usr/local/bin/audible-ingest</code></dd>
+      <dt>Re-auth</dt><dd><code>docker exec -it audible-ingest-audible-ingest-1 audible quickstart</code> (AU marketplace)</dd>
+    </dl>
+  </div>
+
+  <!-- calibre-web -->
+  <div class="card">
+    <h4>Calibre-Web (CWA + kobodl) <span class="pill docker">docker</span></h4>
+    <div class="meta">apps LXC · <code>192.168.0.97:8083</code> · <code>calibre.monotrope.au</code></div>
+    <dl class="kv">
+      <dt>Shell</dt><dd><code>docker exec -it calibre-calibre-web-1 bash</code></dd>
+      <dt>Logs</dt><dd><code>docker logs --tail 200 -f calibre-calibre-web-1</code></dd>
+      <dt>State</dt><dd><code>calibre_calibre_config</code> (CWA settings, users)<br><code>calibre_kobodl_config</code> (Kobo OAuth)<br><code>calibre_kobo_ingest_state</code> (ingest cursor)<br><code>cwa_ingest</code> (CWA dropbox)<br>Books: NFS <code>/library/books</code> → <code>/calibre-library</code></dd>
+      <dt>Restart</dt><dd><code>cd /opt/calibre &amp;&amp; docker compose restart calibre-web</code></dd>
+    </dl>
+  </div>
+
+  <!-- KoInsight -->
+  <div class="card">
+    <h4>KoInsight <span class="pill docker">docker</span></h4>
+    <div class="meta">apps LXC · <code>192.168.0.97:3001</code> · <code>koinsight.monotrope.au</code></div>
+    <dl class="kv">
+      <dt>Shell</dt><dd><code>docker exec -it koinsight-koinsight-1 sh</code></dd>
+      <dt>Logs</dt><dd><code>docker logs --tail 200 -f koinsight-koinsight-1</code></dd>
+      <dt>State</dt><dd><code>koinsight_data</code> volume (sqlite for KOReader stats)</dd>
+      <dt>Restart</dt><dd><code>cd /opt/koinsight &amp;&amp; docker compose restart</code></dd>
+    </dl>
+  </div>
+
+  <!-- Miniflux -->
+  <div class="card">
+    <h4>Miniflux <span class="pill docker">docker</span></h4>
+    <div class="meta">apps LXC · <code>192.168.0.97:8080</code> · <code>reader.monotrope.au</code></div>
+    <dl class="kv">
+      <dt>Shell</dt><dd><code>docker exec -it miniflux-miniflux-1 sh</code></dd>
+      <dt>Logs</dt><dd>app: <code>docker logs miniflux-miniflux-1</code><br>db: <code>docker logs miniflux-db-1</code></dd>
+      <dt>State</dt><dd><code>miniflux_miniflux_db</code> (postgres 16 datadir)</dd>
+      <dt>Backup</dt><dd><code>docker exec miniflux-db-1 pg_dump -U miniflux miniflux | gzip &gt; mf-$(date +%F).sql.gz</code></dd>
+    </dl>
+  </div>
+
+  <!-- Jellyfin -->
+  <div class="card">
+    <h4>Jellyfin <span class="pill native">native</span></h4>
+    <div class="meta">jellyfin LXC · <code>192.168.0.99:8096</code> · <code>jellyfin.monotrope.au</code></div>
+    <dl class="kv">
+      <dt>Shell</dt><dd>SSH directly: <code>ssh root@192.168.0.99</code></dd>
+      <dt>Logs</dt><dd><code>journalctl -u jellyfin -f</code><br>app log: <code>/var/log/jellyfin/jellyfin*.log</code></dd>
+      <dt>Config</dt><dd><code>/etc/jellyfin/</code> (system, network, encoding)</dd>
+      <dt>State</dt><dd><code>/var/lib/jellyfin/</code> (db, metadata, plugins, libraries)<br>Media: NFS-RO <code>/media</code></dd>
+      <dt>Restart</dt><dd><code>systemctl restart jellyfin</code></dd>
+    </dl>
+  </div>
+
+  <!-- *arr stack -->
+  <div class="card">
+    <h4>*arr stack <span class="pill docker">docker</span></h4>
+    <div class="meta">media-stack LXC · <code>192.168.0.98</code></div>
+    <dl class="kv">
+      <dt>Containers</dt><dd><code>gluetun</code> (ProtonVPN WG)<br><code>qbittorrent</code> (uses gluetun netns)<br><code>sonarr 8989</code>, <code>radarr 7878</code>, <code>lidarr 8686</code>, <code>prowlarr 9696</code></dd>
+      <dt>Shell</dt><dd><code>docker exec -it sonarr bash</code> (etc.)</dd>
+      <dt>Logs</dt><dd><code>docker logs --tail 200 -f &lt;name&gt;</code><br>gluetun health: <code>docker logs gluetun | grep -i health</code></dd>
+      <dt>State</dt><dd>Compose lives at <code>/opt/media-stack/</code>; per-service config is bind-mounted under <code>/opt/media-stack/&lt;name&gt;/</code> on host. Media on NFS at <code>/data</code>.</dd>
+      <dt>Restart all</dt><dd><code>cd /opt/media-stack &amp;&amp; docker compose restart</code></dd>
+    </dl>
+  </div>
+
+  <!-- Hermes -->
+  <div class="card">
+    <h4>Hermes Agent <span class="pill native">native</span></h4>
+    <div class="meta">hermes LXC · <code>192.168.0.96</code> · no public port</div>
+    <dl class="kv">
+      <dt>Shell</dt><dd><code>ssh root@192.168.0.96</code></dd>
+      <dt>Logs</dt><dd>journald: <code>journalctl -u hermes-gateway -f</code><br>file logs: <code>/opt/data/logs/</code> (preferred — richer)</dd>
+      <dt>Config</dt><dd><code>/etc/default/hermes-gateway</code> (env)<br><code>/root/.hermes/</code> (state, db, MCP)</dd>
+      <dt>Venv</dt><dd><code>/usr/local/lib/hermes-agent/.venv</code></dd>
+      <dt>Restart</dt><dd><code>systemctl restart hermes-gateway</code></dd>
+    </dl>
+  </div>
+
+  <!-- Caddy -->
+  <div class="card">
+    <h4>Caddy <span class="pill native">native</span></h4>
+    <div class="meta">pve host · binds <code>192.168.0.59:443</code> + <code>100.88.127.39:443</code></div>
+    <dl class="kv">
+      <dt>Config</dt><dd><code>/etc/caddy/Caddyfile</code> — single <code>*.monotrope.au</code> block, host matchers per service</dd>
+      <dt>Reload</dt><dd><code>systemctl reload caddy</code> (no restart needed for Caddyfile changes)</dd>
+      <dt>Logs</dt><dd><code>journalctl -u caddy -f</code></dd>
+      <dt>TLS</dt><dd>Cloudflare DNS-01 for wildcard; token in env. Cert lives in Caddy's data dir (<code>/var/lib/caddy/.local/share/caddy</code>).</dd>
+    </dl>
+  </div>
+
+  <!-- Proxmox host -->
+  <div class="card">
+    <h4>Proxmox VE <span class="pill native">host</span></h4>
+    <div class="meta"><code>192.168.0.59</code> · web UI <code>https://192.168.0.59:8006</code></div>
+    <dl class="kv">
+      <dt>Guests</dt><dd>defs in <code>/etc/pve/lxc/&lt;vmid&gt;.conf</code> &amp; <code>/etc/pve/qemu-server/100.conf</code></dd>
+      <dt>Operate</dt><dd><code>pct {list,start,stop,enter,reboot} &lt;vmid&gt;</code><br><code>qm {list,start,stop,terminal} 100</code></dd>
+      <dt>Logs</dt><dd>per-guest: <code>pct console &lt;vmid&gt;</code> &amp; <code>journalctl</code> inside</dd>
+      <dt>Storage</dt><dd><code>pvesm status</code> · LXC rootfs on <code>local-lvm</code></dd>
+    </dl>
+  </div>
+
+  <!-- HAOS -->
+  <div class="card">
+    <h4>Home Assistant <span class="pill vm">VM</span></h4>
+    <div class="meta">VM 100 · <code>192.168.0.86:8123</code></div>
+    <dl class="kv">
+      <dt>Shell</dt><dd>HA "Terminal &amp; SSH" add-on (web SSH on port 8123 → Terminal tab)<br>or PVE: <code>qm terminal 100</code></dd>
+      <dt>Logs</dt><dd>UI: Settings → System → Logs<br>raw: <code>/config/home-assistant.log</code> via SSH add-on</dd>
+      <dt>Backups</dt><dd>HA Settings → System → Backups (download manually)</dd>
+    </dl>
+  </div>
+
+</div>
+
+<!-- ====================================================== NETWORKS -->
+<h2 id="networks">Network details</h2>
+
+<h3>LAN</h3>
+<ul class="compact">
+  <li>Single flat <code>192.168.0.0/24</code>. Router at <code>.1</code>, NAS at <code>.49</code>, PVE at <code>.59</code>, guests at <code>.96–.99</code> and <code>.86</code> (HAOS).</li>
+  <li>All PVE guests use DHCP with MAC reservations at the router — never static-in-guest. LXCs use SLAAC for IPv6 (<code>ip6=auto</code>, never <code>dhcp</code>).</li>
+  <li>PVE bridge <code>vmbr0</code> bridges the host NIC; guests attach directly. No internal Proxmox subnets.</li>
+</ul>
+
+<h3>Tailnet</h3>
+<ul class="compact">
+  <li>Only the PVE host runs Tailscale. Guests reach the tailnet only through PVE (and they don't need to — services bind LAN).</li>
+  <li><code>*.monotrope.au</code> is a wildcard CNAME pointing to PVE's tailscale IP. So <code>abs.monotrope.au</code> resolves only on tailnet-connected devices.</li>
+  <li>Caddy binds <strong>both</strong> the LAN IP (<code>192.168.0.59</code>) and the Tailscale IP (<code>100.88.127.39</code>) — reachable from either side.</li>
+  <li>Inspect: <code>tailscale status</code>, <code>tailscale ip -4</code>, <code>tailscale ping &lt;peer&gt;</code>.</li>
+</ul>
+
+<h3>NFS (NAS → LXCs)</h3>
+<table>
+  <thead><tr><th>NFS export</th><th>Mounted in</th><th>At</th><th>Mode</th></tr></thead>
+  <tbody>
+    <tr><td><code>/volume1/library</code></td><td>apps (103)</td><td><code>/library</code></td><td>rw</td></tr>
+    <tr><td><code>/volume1/media</code></td><td>media-stack (102)</td><td><code>/data</code></td><td>rw</td></tr>
+    <tr><td><code>/volume1/media</code></td><td>jellyfin (101)</td><td><code>/media</code></td><td>ro</td></tr>
+  </tbody>
+</table>
+<p class="small">All NFSv4.1. The LXCs have the <code>nas_idmap</code> feature so uid/gid 1028 inside maps to the NAS <code>homelab</code> user. Root inside an unprivileged LXC squashes to <code>nobody</code> on the NAS — that's why <code>ls /library</code> as root fails but the containers (running as 1028) read fine.</p>
+
+<h3>Caddy → upstream map</h3>
+<div class="scroll-x">
+<table>
+  <thead><tr><th>Hostname</th><th>Upstream</th><th>Service</th></tr></thead>
+  <tbody>
+    <tr><td><code>jellyfin.monotrope.au</code></td><td><code>192.168.0.99:8096</code></td><td>Jellyfin</td></tr>
+    <tr><td><code>qbit.monotrope.au</code></td><td><code>192.168.0.98:8080</code></td><td>qBittorrent (via gluetun)</td></tr>
+    <tr><td><code>sonarr.monotrope.au</code></td><td><code>192.168.0.98:8989</code></td><td>Sonarr</td></tr>
+    <tr><td><code>radarr.monotrope.au</code></td><td><code>192.168.0.98:7878</code></td><td>Radarr</td></tr>
+    <tr><td><code>lidarr.monotrope.au</code></td><td><code>192.168.0.98:8686</code></td><td>Lidarr</td></tr>
+    <tr><td><code>prowlarr.monotrope.au</code></td><td><code>192.168.0.98:9696</code></td><td>Prowlarr</td></tr>
+    <tr><td><code>calibre.monotrope.au</code></td><td><code>192.168.0.97:8083</code></td><td>Calibre-Web</td></tr>
+    <tr><td><code>abs.monotrope.au</code></td><td><code>192.168.0.97:13378</code></td><td>Audiobookshelf</td></tr>
+    <tr><td><code>koinsight.monotrope.au</code></td><td><code>192.168.0.97:3001</code></td><td>KoInsight</td></tr>
+    <tr><td><code>reader.monotrope.au</code></td><td><code>192.168.0.97:8080</code></td><td>Miniflux</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Docker networks (per LXC)</h3>
+<p>Compose creates one bridge network per project, named <code>&lt;dir&gt;_default</code>. So:</p>
+<ul class="compact">
+  <li>apps LXC: <code>audiobookshelf_default</code>, <code>calibre_default</code>, <code>miniflux_default</code> (app+db share this one), <code>koinsight_default</code>, <code>audible-ingest_default</code> — no shared net, each project isolated.</li>
+  <li>media-stack: single <code>media-stack_default</code>; <code>qbittorrent</code> doesn't use it — it joins <code>gluetun</code>'s network namespace via <code>network_mode: service:gluetun</code>. That's how qbit's traffic is forced through the VPN. Inbound to qbit's WebUI hits <code>gluetun</code>'s published port <code>8080</code>.</li>
+  <li>Inspect: <code>docker network ls</code>, <code>docker network inspect &lt;name&gt;</code>.</li>
+</ul>
+
+<!-- ====================================================== STATE -->
+<h2 id="state">State &amp; persistence</h2>
+
+<p class="lead">Three layers of state. Treat them differently.</p>
+
+<table>
+  <thead><tr><th>Layer</th><th>What</th><th>Where</th><th>Reproducible?</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Code/config</strong></td>
+      <td>Compose files, systemd units, Caddyfile, all settings</td>
+      <td>This repo (<code>infra/ansible/</code>) — applied via <code>make home</code></td>
+      <td>Yes — Ansible is the source of truth. Edit here, never on the host.</td>
+    </tr>
+    <tr>
+      <td><strong>Runtime state</strong></td>
+      <td>Per-service databases, caches, queues</td>
+      <td>Docker named volumes on each LXC; native services on host filesystems</td>
+      <td>Mostly. Recreatable but losing it = losing sessions, scan results, progress, listening position.</td>
+    </tr>
+    <tr>
+      <td><strong>Auth tokens / cred state</strong></td>
+      <td>Audible OAuth, Kobo OAuth, Hermes Telegram/email creds, GWS tokens</td>
+      <td>Volumes (<code>audible_config</code>, <code>kobodl_config</code>) &amp; <code>/root/.hermes/</code></td>
+      <td><strong>No</strong> — interactively bootstrapped, irreplaceable without re-doing OAuth flows. <em>File-level backup before any migration.</em></td>
+    </tr>
+    <tr>
+      <td><strong>Bulk data</strong></td>
+      <td>Audiobooks, books, media</td>
+      <td>NAS volumes — Synology snapshots + its own backup discipline</td>
+      <td>NAS handles it. Don't keep authoritative copies on LXC disks.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Key state files (the ones worth knowing by name)</h3>
+<table>
+  <thead><tr><th>File / volume</th><th>Service</th><th>What it holds</th></tr></thead>
+  <tbody>
+    <tr><td><code>audiobookshelf_config</code> → <code>/config/absdatabase.sqlite</code></td><td>ABS</td><td>Library items, users, sessions, <strong>media progress</strong>, API tokens</td></tr>
+    <tr><td><code>audiobookshelf_metadata</code> → <code>/metadata/</code></td><td>ABS</td><td>Cover images, scan logs (<code>logs/scans/*.txt</code>), daily logs</td></tr>
+    <tr><td><code>audible-ingest_audible_state</code> → <code>state.json</code></td><td>audible-ingest</td><td>Per-ASIN status (<code>imported</code> / <code>pinned</code>). Folder existence is the real gate.</td></tr>
+    <tr><td><code>audible-ingest_audible_config</code> → <code>/var/lib/audible-cli/</code></td><td>audible-ingest</td><td>OAuth token. <strong>Interactive re-bootstrap if lost.</strong></td></tr>
+    <tr><td><code>calibre_calibre_config</code></td><td>Calibre-Web</td><td>App db, users, reading state</td></tr>
+    <tr><td><code>calibre_kobodl_config</code></td><td>kobodl</td><td>Kobo OAuth — <strong>interactive re-bootstrap if lost</strong></td></tr>
+    <tr><td><code>calibre_kobo_ingest_state</code></td><td>kobo-ingest</td><td>Receipt cursor / per-book status</td></tr>
+    <tr><td><code>miniflux_miniflux_db</code></td><td>Miniflux</td><td>Postgres data dir (feeds, entries, read state)</td></tr>
+    <tr><td><code>/var/lib/jellyfin/</code></td><td>Jellyfin</td><td>Library db, user watch state, metadata</td></tr>
+    <tr><td><code>/root/.hermes/</code></td><td>Hermes</td><td>Skills state, gateway auth, MCP config</td></tr>
+    <tr><td><code>/etc/caddy/Caddyfile</code> + <code>/var/lib/caddy/</code></td><td>Caddy</td><td>Routing + ACME account/keys</td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <strong>Auth tokens needing file-level backup before any migration:</strong>
+  audible-cli OAuth, kobodl OAuth, Hermes Telegram/email creds, Google Workspace tokens,
+  Obsidian sync. Each is interactive-only to re-create; losing them is hours of re-pairing.
+</div>
+
+<!-- ====================================================== RECIPES -->
+<h2 id="recipes">Common recipes</h2>
+
+<h3>Force a re-ingest of one audiobook (Audible pushed an update)</h3>
+<p>Same ASIN, new file. The sweep skips folders that already have a <code>.m4b</code>, so the gate is the file, not the state.</p>
+<pre><code># 1. Drop the old file
+ssh root@192.168.0.97 \
+  docker exec audible-ingest-audible-ingest-1 \
+    rm "/audiobooks/&lt;Author&gt;/&lt;Title&gt;/&lt;file&gt;.m4b"
+
+# 2. (Optional) clear the ASIN from state.json so it reports as a fresh download
+ssh root@192.168.0.97 docker exec audible-ingest-audible-ingest-1 python3 -c '
+import json, pathlib
+p = pathlib.Path("/var/lib/audible-ingest/state.json")
+s = json.loads(p.read_text())
+s.pop("&lt;ASIN&gt;", None)
+p.with_suffix(".tmp").write_text(json.dumps(s, indent=2, sort_keys=True))
+p.with_suffix(".tmp").replace(p)
+'
+
+# 3. Trigger the sweep (one book, no throttle)
+ssh root@192.168.0.97 \
+  docker exec -e MAX_PER_RUN=1 -e SLEEP_MIN=0 -e SLEEP_MAX=0 \
+    audible-ingest-audible-ingest-1 /usr/local/bin/audible-ingest
+
+# 4. Force ABS to rescan (NFS-mounted libraries don't always fire watcher events)
+LIB=$(ssh root@192.168.0.97 docker run --rm -v audiobookshelf_config:/c:ro alpine sh -c \
+  'apk add -q sqlite &gt;/dev/null && sqlite3 /c/absdatabase.sqlite "SELECT id FROM libraries;"')
+TOK=$(ssh root@192.168.0.97 docker run --rm -v audiobookshelf_config:/c:ro alpine sh -c \
+  'apk add -q sqlite &gt;/dev/null && sqlite3 /c/absdatabase.sqlite "SELECT token FROM users WHERE type=\"root\";"')
+ssh root@192.168.0.97 \
+  curl -sS -X POST -H "Authorization: Bearer $TOK" \
+    "http://127.0.0.1:13378/audiobookshelf/api/libraries/$LIB/scan?force=1"</code></pre>
+
+<h3>Apply an Ansible change</h3>
+<pre><code>make home                      # whole homelab
+make home LIMIT=apps           # just one LXC
+make home LIMIT=apps TAGS=audible_ingest   # narrow further if tagged</code></pre>
+
+<h3>Restart a service</h3>
+<pre><code># Docker (compose project)
+ssh root@&lt;ip&gt; "cd /opt/&lt;service&gt; &amp;&amp; docker compose restart"
+
+# Native (systemd)
+ssh root@&lt;ip&gt; systemctl restart &lt;service&gt;
+
+# Whole LXC (rare — disruptive)
+ssh root@192.168.0.59 pct reboot &lt;vmid&gt;</code></pre>
+
+<h3>Tail logs</h3>
+<pre><code># Docker
+ssh root@192.168.0.97 docker logs --tail 200 -f audiobookshelf-audiobookshelf-1
+
+# Systemd unit
+ssh root@192.168.0.96 journalctl -u hermes-gateway -f
+
+# A timer's last run output
+ssh root@192.168.0.97 journalctl -u audible-ingest.service -n 200 --no-pager
+ssh root@192.168.0.97 systemctl list-timers audible-ingest.timer</code></pre>
+
+<h3>Free disk on an LXC</h3>
+<pre><code>ssh root@&lt;ip&gt; df -h /
+ssh root@&lt;ip&gt; docker system df
+ssh root@&lt;ip&gt; docker image prune -af   # only if you know what you're discarding
+ssh root@&lt;ip&gt; journalctl --vacuum-time=7d</code></pre>
+
+<h3>Audible re-auth (after token expires / wipe)</h3>
+<pre><code>ssh root@192.168.0.97
+docker exec -it audible-ingest-audible-ingest-1 audible quickstart
+# choose AU, follow login. Then re-chown volumes so files belong to 1028:
+make home LIMIT=apps TAGS=audible_ingest</code></pre>
+
+<h3>Cloudflare-side service unreachable</h3>
+<pre><code># 1. Are you on the tailnet?
+tailscale status | grep pve
+
+# 2. Resolving to the tailscale IP?
+dig +short abs.monotrope.au          # expect 100.88.127.39
+
+# 3. Caddy alive on pve?
+ssh root@192.168.0.59 systemctl status caddy --no-pager
+ssh root@192.168.0.59 journalctl -u caddy -n 50 --no-pager
+
+# 4. Backend reachable from pve?
+ssh root@192.168.0.59 curl -fsS http://192.168.0.97:13378/ -o /dev/null -w "%{http_code}\n"</code></pre>
+
+<!-- ====================================================== TROUBLESHOOTING -->
+<h2 id="troubleshooting">Troubleshooting cheatsheet</h2>
+
+<details>
+  <summary>An import doesn't show up in ABS</summary>
+  <ul class="compact">
+    <li>Confirm the file is on the NAS path the container sees: <code>docker exec audiobookshelf-audiobookshelf-1 ls "/audiobooks/&lt;Author&gt;/&lt;Title&gt;"</code></li>
+    <li>NFS watchers are unreliable. Trigger a forced scan via the API (see recipe).</li>
+    <li>ABS dedupes by libraryItemId, not file hash. Same path = same item — if you replace a file in place, scan shows <em>Updated</em>, not Added.</li>
+  </ul>
+</details>
+
+<details>
+  <summary>audible-ingest is downloading the wrong title / failing</summary>
+  <ul class="compact">
+    <li>Audible "Sable 404" errors are upstream — Audible has removed the title from your library or it's region-blocked. Pin the ASIN: edit <code>state.json</code> set <code>"status": "pinned"</code>.</li>
+    <li>Check the current view: <code>docker exec audible-ingest-audible-ingest-1 audible library list | grep -i &lt;title&gt;</code>.</li>
+    <li>Tokens expired: <code>audible library list</code> returns an auth error → re-run quickstart.</li>
+  </ul>
+</details>
+
+<details>
+  <summary>qbit/sonarr can't reach the internet</summary>
+  <ul class="compact">
+    <li>qbit runs <em>inside</em> gluetun's netns. If gluetun is unhealthy, qbit has no network at all.</li>
+    <li><code>docker logs gluetun | tail -50</code> — look for handshake / PMP errors.</li>
+    <li>Forwarded port pushed to qbit via <code>/scripts/qbit-port.sh</code> on each tunnel-up. If the port stops working, restart gluetun (which restarts qbit by dependency).</li>
+  </ul>
+</details>
+
+<details>
+  <summary>NFS reads fail / Permission denied on /library or /data</summary>
+  <ul class="compact">
+    <li>Running as root inside an unprivileged LXC? You'll squash to <code>nobody</code> on the NAS. Run as uid 1028 (every compose file is already set up that way; the trap is when running ad-hoc <code>docker run …</code>).</li>
+    <li>Check the mount is up: <code>mount | grep nfs</code> on the LXC.</li>
+    <li>NAS-side: NFS export permissions for the LXC's IP and the <code>homelab</code> user.</li>
+  </ul>
+</details>
+
+<details>
+  <summary>Caddy serves "no service mapped for &lt;host&gt;" 404</summary>
+  <ul class="compact">
+    <li>You added a new subdomain to DNS but not to <code>/etc/caddy/Caddyfile</code>. Add a <code>@name host …</code> + <code>handle</code> block (mirror an existing one), then <code>systemctl reload caddy</code>.</li>
+    <li>Or the DNS record points somewhere other than the tailscale IP — check <code>dig</code>.</li>
+  </ul>
+</details>
+
+<details>
+  <summary>Need a one-off shell on a host without SSH config</summary>
+  <ul class="compact">
+    <li>From any machine on the tailnet: <code>ssh root@192.168.0.59</code> reaches PVE.</li>
+    <li>From PVE: <code>pct enter &lt;vmid&gt;</code> for an LXC, <code>qm terminal 100</code> for HAOS.</li>
+  </ul>
+</details>
+
+<hr>
+<p class="small right">Generated 2026-05-16 · source of truth: <code>infra/ansible/inventories/home/</code></p>
+
+</body>
+</html>
