@@ -88,6 +88,26 @@
   loop_control:
     label: "vmid={{ item.0.vmid }} feature={{ item.1 }}"
 
+- name: Ensure LXC has no hardcoded nameserver (use DHCP-provided DNS)
+  ansible.builtin.command:
+    cmd: "pct set {{ item.vmid }} --delete nameserver"
+  loop: "{{ proxmox_lxc_apply }}"
+  loop_control:
+    label: "vmid={{ item.vmid }}"
+  vars:
+    current_ns: >-
+      {{
+        (lxc_confs_raw.results
+         | selectattr('item.vmid', 'equalto', item.vmid)
+         | map(attribute='content') | first | b64decode).splitlines()
+        | select('match', '^nameserver:')
+        | map('regex_replace', '^nameserver:\\s*', '')
+        | first | default('')
+      }}
+  when: current_ns != ''
+  changed_when: true
+  register: lxc_ns_cleared
+
 - name: Ensure subuid entries for passthrough UIDs
   ansible.builtin.lineinfile:
     path: /etc/subuid
@@ -103,8 +123,15 @@
   loop: "{{ proxmox_passthrough_gids | default([]) | unique | sort }}"
 
 - name: Restart LXCs whose host-side config changed
-  ansible.builtin.command: "pct reboot {{ item.item.0.vmid }}"
-  loop: "{{ lxc_confs_apply.results | selectattr('changed', 'equalto', true) | list }}"
-  loop_control:
-    label: "vmid={{ item.item.0.vmid }}"
+  ansible.builtin.command: "pct reboot {{ item }}"
+  loop: >-
+    {{
+      ((lxc_confs_apply.results
+        | selectattr('changed', 'equalto', true)
+        | map(attribute='item.0.vmid') | list)
+       + (lxc_ns_cleared.results | default([])
+          | selectattr('changed', 'equalto', true)
+          | map(attribute='item.vmid') | list))
+      | unique
+    }}
   changed_when: true
