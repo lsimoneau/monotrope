@@ -1,0 +1,28 @@
+services:
+  pihole:
+    image: {{ pihole_image }}
+    container_name: pihole
+    restart: unless-stopped
+    # Host networking so :53 binds directly on the LXC's eth0 without
+    # docker-proxy in front (which would mangle the source IP that
+    # Pi-hole logs as the querying client).
+    network_mode: host
+    environment:
+      TZ: "{{ pihole_tz }}"
+      # Pi-hole v6 env vars (FTLCONF_*). Webserver password is read on
+      # first boot; subsequent changes via the admin UI win.
+      FTLCONF_webserver_api_password: "${PIHOLE_WEB_PASSWORD}"
+      FTLCONF_dns_upstreams: "{{ pihole_upstream_dns | join(';') }}"
+      # See defaults/main.yml for why this is "all" — TP-Link router
+      # sources WAN-DNS forwarder queries from its CGNAT WAN IP, which
+      # the stricter "local" mode rejects.
+      FTLCONF_dns_listeningMode: "{{ pihole_listening_mode }}"
+      FTLCONF_webserver_domain: "pihole.monotrope.au"
+      # Trust Caddy on the Proxmox host as a reverse proxy so the admin
+      # UI sees real client IPs in logs.
+      FTLCONF_webserver_api_trusted__proxies: "192.168.0.59"
+    volumes:
+      - ./etc-pihole:/etc/pihole
+    cap_add:
+      - NET_ADMIN
+      - SYS_NICE

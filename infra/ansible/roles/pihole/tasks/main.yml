@@ -1,0 +1,44 @@
+---
+- name: Ensure pihole directory
+  ansible.builtin.file:
+    path: "{{ pihole_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Render compose.yml
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ pihole_dir }}/compose.yml"
+    owner: root
+    group: root
+    mode: '0644'
+  register: pihole_compose
+
+- name: Render .env
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ pihole_dir }}/.env"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+  register: pihole_env
+
+- name: Bring up pihole
+  ansible.builtin.command:
+    cmd: docker compose up -d --pull always --remove-orphans
+    chdir: "{{ pihole_dir }}"
+  register: pihole_up
+  changed_when: >-
+    'Started' in pihole_up.stderr
+    or 'Created' in pihole_up.stderr
+    or 'Recreate' in pihole_up.stderr
+
+- name: Restart pihole if compose or env changed
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate
+    chdir: "{{ pihole_dir }}"
+  when: pihole_compose.changed or pihole_env.changed
+  changed_when: true

@@ -1,0 +1,19 @@
+---
+pihole_dir: /opt/pihole
+pihole_image: pihole/pihole:2025.10.0
+pihole_tz: Australia/Sydney
+
+# Upstream resolvers Pi-hole forwards to after applying blocklists.
+# Plain DNS over 53 — encrypted upstreams are an option later if we
+# want to hide queries from the ISP.
+pihole_upstream_dns:
+  - 1.1.1.1
+  - 9.9.9.9
+
+# "all" lets Pi-hole answer queries arriving on any interface from any
+# source IP. Needed because the router (TP-Link Archer AX55) sources
+# its WAN-DNS forwarder queries from its CGNAT WAN address, which the
+# stricter "local" mode rejects. Safe here: the LXC has only LAN +
+# Tailscale interfaces and is never internet-exposed (Caddy only
+# proxies HTTP/HTTPS, no port-53 forward at the router).
+pihole_listening_mode: all

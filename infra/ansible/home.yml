@@ -45,3 +45,10 @@
   become: true
   roles:
     - hermes
+
+- name: Provision pihole LXC
+  hosts: pihole
+  become: true
+  roles:
+    - docker
+    - pihole

@@ -32,3 +32,5 @@ caddy_sites:
     upstream: 192.168.0.97:3001
   - host: reader.monotrope.au
     upstream: 192.168.0.97:8080
+  - host: pihole.monotrope.au
+    upstream: 192.168.0.95:80
