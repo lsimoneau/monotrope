@@ -1,0 +1,707 @@
+title: Home
+button_card_templates:
+  zone_block:
+    show_icon: false
+    show_state: false
+    show_name: true
+    tap_action:
+      action: more-info
+    styles:
+      card:
+        - padding: 10px 14px
+      grid:
+        - grid-template-areas: '"n info" "actions actions"'
+        - grid-template-columns: auto 1fr
+        - grid-template-rows: auto auto
+        - grid-row-gap: 8px
+        - grid-column-gap: 12px
+        - align-items: baseline
+      name:
+        - justify-self: start
+        - font-size: 14px
+        - font-weight: 600
+        - color: var(--primary-text-color)
+      custom_fields:
+        info:
+          - justify-self: end
+          - font-size: 12px
+        actions:
+          - justify-self: stretch
+          - width: 100%
+    extra_styles: |
+      .zone-info { color: var(--secondary-text-color); }
+      .zone-info .on { color: var(--success-color, #43a047); font-weight: 600; }
+  zone_btn:
+    show_icon: false
+    show_name: true
+    show_state: false
+    styles:
+      card:
+        - padding: 5px 4px
+        - min-height: 32px
+      name:
+        - font-size: 11px
+        - font-weight: 600
+views:
+- title: Home
+  path: home
+  icon: mdi:home
+  type: sections
+  max_columns: 3
+  sections:
+  - type: grid
+    cards:
+    - type: heading
+      heading: Heat Pump Hot Water
+      icon: mdi:water-boiler
+    - type: tile
+      entity: water_heater.heat_pump_hot_water
+      name: Mode
+      features_position: bottom
+      features:
+      - type: water-heater-operation-modes
+        operation_modes:
+        - 'off'
+        - eco
+        - heat_pump
+        - performance
+    - type: sensor
+      entity: sensor.heat_pump_hot_water_current_temperature
+      name: Tank
+      graph: line
+      hours_to_show: 48
+  - type: grid
+    cards:
+    - type: heading
+      heading: AC
+      icon: mdi:air-conditioner
+    - type: tile
+      entity: climate.ac
+      name: Master
+      features_position: bottom
+      features:
+      - type: climate-hvac-modes
+        hvac_modes:
+        - 'off'
+        - cool
+        - heat
+        - fan_only
+      - type: climate-preset-modes
+        preset_modes:
+        - MyZone
+        - MyTemp
+        - MyAuto
+        style: dropdown
+  - type: grid
+    cards:
+    - type: heading
+      heading: Weather
+      icon: mdi:weather-partly-cloudy
+    - type: weather-forecast
+      entity: weather.forecast_home
+      forecast_type: daily
+      show_current: true
+      show_forecast: true
+  - type: grid
+    cards:
+    - type: heading
+      heading: Energy
+      icon: mdi:flash
+    - type: tile
+      entity: sensor.solarnet_power_photovoltaics
+      name: Solar now
+      icon: mdi:solar-power
+      color: yellow
+    - type: tile
+      entity: sensor.electricity_advisor_power
+      name: Grid now
+      icon: mdi:transmission-tower
+      color: blue
+    - type: statistic
+      entity: sensor.primo_5_0_1_energy_day
+      name: Solar today
+      icon: mdi:weather-sunny
+      stat_type: change
+      period:
+        calendar:
+          period: day
+    - type: statistic
+      entity: sensor.electricity_advisor_energy_today
+      name: Grid today
+      icon: mdi:lightning-bolt
+      stat_type: change
+      period:
+        calendar:
+          period: day
+    - type: energy-date-selection
+    - type: energy-usage-graph
+  - type: grid
+    cards:
+    - type: heading
+      heading: Zones
+      icon: mdi:thermostat
+    - type: conditional
+      conditions:
+      - condition: state
+        entity: climate.ac
+        state_not: 'off'
+      card:
+        type: tile
+        entity: climate.ac_lounge
+        name: Living Room
+        icon: mdi:sofa
+        features_position: bottom
+        features:
+        - type: climate-hvac-modes
+          hvac_modes:
+          - 'off'
+          - heat_cool
+        - type: target-temperature
+    - type: conditional
+      conditions:
+      - condition: state
+        entity: climate.ac
+        state: 'off'
+      card:
+        type: tile
+        entity: climate.ac_lounge
+        name: Living Room
+        icon: mdi:sofa
+    - type: conditional
+      conditions:
+      - condition: state
+        entity: climate.ac
+        state_not: 'off'
+      card:
+        type: tile
+        entity: climate.ac_dining
+        name: Dining Room
+        icon: mdi:silverware-fork-knife
+        features_position: bottom
+        features:
+        - type: climate-hvac-modes
+          hvac_modes:
+          - 'off'
+          - heat_cool
+        - type: target-temperature
+    - type: conditional
+      conditions:
+      - condition: state
+        entity: climate.ac
+        state: 'off'
+      card:
+        type: tile
+        entity: climate.ac_dining
+        name: Dining Room
+        icon: mdi:silverware-fork-knife
+    - type: conditional
+      conditions:
+      - condition: state
+        entity: climate.ac
+        state_not: 'off'
+      card:
+        type: tile
+        entity: climate.ac_bed_1
+        name: Bedroom
+        icon: mdi:bed-queen
+        features_position: bottom
+        features:
+        - type: climate-hvac-modes
+          hvac_modes:
+          - 'off'
+          - heat_cool
+        - type: target-temperature
+    - type: conditional
+      conditions:
+      - condition: state
+        entity: climate.ac
+        state: 'off'
+      card:
+        type: tile
+        entity: climate.ac_bed_1
+        name: Bedroom
+        icon: mdi:bed-queen
+    - type: conditional
+      conditions:
+      - condition: state
+        entity: climate.ac
+        state_not: 'off'
+      card:
+        type: tile
+        entity: climate.ac_bed_2
+        name: Kids Room
+        icon: mdi:teddy-bear
+        features_position: bottom
+        features:
+        - type: climate-hvac-modes
+          hvac_modes:
+          - 'off'
+          - heat_cool
+        - type: target-temperature
+    - type: conditional
+      conditions:
+      - condition: state
+        entity: climate.ac
+        state: 'off'
+      card:
+        type: tile
+        entity: climate.ac_bed_2
+        name: Kids Room
+        icon: mdi:teddy-bear
+    - type: conditional
+      conditions:
+      - condition: state
+        entity: climate.ac
+        state_not: 'off'
+      card:
+        type: tile
+        entity: climate.ac_bed_3
+        name: Remy's Bedroom
+        icon: mdi:bed-single
+        features_position: bottom
+        features:
+        - type: climate-hvac-modes
+          hvac_modes:
+          - 'off'
+          - heat_cool
+        - type: target-temperature
+    - type: conditional
+      conditions:
+      - condition: state
+        entity: climate.ac
+        state: 'off'
+      card:
+        type: tile
+        entity: climate.ac_bed_3
+        name: Remy's Bedroom
+        icon: mdi:bed-single
+    - type: conditional
+      conditions:
+      - condition: state
+        entity: climate.ac
+        state_not: 'off'
+      card:
+        type: tile
+        entity: climate.ac_rumpus
+        name: Office
+        icon: mdi:desk
+        features_position: bottom
+        features:
+        - type: climate-hvac-modes
+          hvac_modes:
+          - 'off'
+          - heat_cool
+        - type: target-temperature
+    - type: conditional
+      conditions:
+      - condition: state
+        entity: climate.ac
+        state: 'off'
+      card:
+        type: tile
+        entity: climate.ac_rumpus
+        name: Office
+        icon: mdi:desk
+    - type: conditional
+      conditions:
+      - condition: state
+        entity: climate.ac
+        state_not: 'off'
+      card:
+        type: tile
+        entity: climate.ac_bath
+        name: Bathroom
+        icon: mdi:shower
+        features_position: bottom
+        features:
+        - type: climate-hvac-modes
+          hvac_modes:
+          - 'off'
+          - heat_cool
+        - type: target-temperature
+    - type: conditional
+      conditions:
+      - condition: state
+        entity: climate.ac
+        state: 'off'
+      card:
+        type: tile
+        entity: climate.ac_bath
+        name: Bathroom
+        icon: mdi:shower
+  - type: grid
+    cards:
+    - type: heading
+      heading: Watering
+      icon: mdi:sprinkler-variant
+    - type: custom:button-card
+      template: zone_block
+      entity: binary_sensor.veggie_garden_watering
+      name: Veggie Garden
+      custom_fields:
+        info: >-
+          [[[ const w = states['binary_sensor.veggie_garden_watering'].state === 'on'; const rem = states['sensor.veggie_garden_remaining_watering_time'].state; const n = states['sensor.veggie_garden_next_cycle'].state; const s = states['switch.veggie_garden_automatic_watering'].state === 'off'; let body; if (w) { body = `<span class="on">● ${rem}m left</span>`; } else if (s) { body = '<span>suspended</span>'; } else if (n === 'unknown' || n === 'unavailable') { body = '<span>idle</span>'; } else { const ns = new Date(n).toLocaleString('en-AU', {weekday: 'short', hour: '2-digit', minute: '2-digit'}); body = `<span>next ${ns}</span>`; } return `<div class="zone-info">${body}</div>`; ]]]
+        actions:
+          card:
+            type: horizontal-stack
+            cards:
+            - type: custom:button-card
+              template: zone_btn
+              name: 30m
+              icon: mdi:water
+              tap_action:
+                action: perform-action
+                perform_action: hydrawise.start_watering
+                data:
+                  duration: 30
+                target:
+                  entity_id: binary_sensor.veggie_garden_watering
+            - type: custom:button-card
+              template: zone_btn
+              name: 60m
+              icon: mdi:water
+              tap_action:
+                action: perform-action
+                perform_action: hydrawise.start_watering
+                data:
+                  duration: 60
+                target:
+                  entity_id: binary_sensor.veggie_garden_watering
+            - type: custom:button-card
+              template: zone_btn
+              name: 90m
+              icon: mdi:water
+              tap_action:
+                action: perform-action
+                perform_action: hydrawise.start_watering
+                data:
+                  duration: 90
+                target:
+                  entity_id: binary_sensor.veggie_garden_watering
+            - type: custom:button-card
+              template: zone_btn
+              name: Stop
+              icon: mdi:stop
+              tap_action:
+                action: perform-action
+                perform_action: valve.close_valve
+                target:
+                  entity_id: valve.veggie_garden
+    - type: custom:button-card
+      template: zone_block
+      entity: binary_sensor.back_garden_watering
+      name: Back Garden
+      custom_fields:
+        info: >-
+          [[[ const w = states['binary_sensor.back_garden_watering'].state === 'on'; const rem = states['sensor.back_garden_remaining_watering_time'].state; const n = states['sensor.back_garden_next_cycle'].state; const s = states['switch.back_garden_automatic_watering'].state === 'off'; let body; if (w) { body = `<span class="on">● ${rem}m left</span>`; } else if (s) { body = '<span>suspended</span>'; } else if (n === 'unknown' || n === 'unavailable') { body = '<span>idle</span>'; } else { const ns = new Date(n).toLocaleString('en-AU', {weekday: 'short', hour: '2-digit', minute: '2-digit'}); body = `<span>next ${ns}</span>`; } return `<div class="zone-info">${body}</div>`; ]]]
+        actions:
+          card:
+            type: horizontal-stack
+            cards:
+            - type: custom:button-card
+              template: zone_btn
+              name: 30m
+              icon: mdi:water
+              tap_action:
+                action: perform-action
+                perform_action: hydrawise.start_watering
+                data:
+                  duration: 30
+                target:
+                  entity_id: binary_sensor.back_garden_watering
+            - type: custom:button-card
+              template: zone_btn
+              name: 60m
+              icon: mdi:water
+              tap_action:
+                action: perform-action
+                perform_action: hydrawise.start_watering
+                data:
+                  duration: 60
+                target:
+                  entity_id: binary_sensor.back_garden_watering
+            - type: custom:button-card
+              template: zone_btn
+              name: 90m
+              icon: mdi:water
+              tap_action:
+                action: perform-action
+                perform_action: hydrawise.start_watering
+                data:
+                  duration: 90
+                target:
+                  entity_id: binary_sensor.back_garden_watering
+            - type: custom:button-card
+              template: zone_btn
+              name: Stop
+              icon: mdi:stop
+              tap_action:
+                action: perform-action
+                perform_action: valve.close_valve
+                target:
+                  entity_id: valve.back_garden
+    - type: custom:button-card
+      template: zone_block
+      entity: binary_sensor.front_garden_watering
+      name: Front Garden
+      custom_fields:
+        info: >-
+          [[[ const w = states['binary_sensor.front_garden_watering'].state === 'on'; const rem = states['sensor.front_garden_remaining_watering_time'].state; const n = states['sensor.front_garden_next_cycle'].state; const s = states['switch.front_garden_automatic_watering'].state === 'off'; let body; if (w) { body = `<span class="on">● ${rem}m left</span>`; } else if (s) { body = '<span>suspended</span>'; } else if (n === 'unknown' || n === 'unavailable') { body = '<span>idle</span>'; } else { const ns = new Date(n).toLocaleString('en-AU', {weekday: 'short', hour: '2-digit', minute: '2-digit'}); body = `<span>next ${ns}</span>`; } return `<div class="zone-info">${body}</div>`; ]]]
+        actions:
+          card:
+            type: horizontal-stack
+            cards:
+            - type: custom:button-card
+              template: zone_btn
+              name: 30m
+              icon: mdi:water
+              tap_action:
+                action: perform-action
+                perform_action: hydrawise.start_watering
+                data:
+                  duration: 30
+                target:
+                  entity_id: binary_sensor.front_garden_watering
+            - type: custom:button-card
+              template: zone_btn
+              name: 60m
+              icon: mdi:water
+              tap_action:
+                action: perform-action
+                perform_action: hydrawise.start_watering
+                data:
+                  duration: 60
+                target:
+                  entity_id: binary_sensor.front_garden_watering
+            - type: custom:button-card
+              template: zone_btn
+              name: 90m
+              icon: mdi:water
+              tap_action:
+                action: perform-action
+                perform_action: hydrawise.start_watering
+                data:
+                  duration: 90
+                target:
+                  entity_id: binary_sensor.front_garden_watering
+            - type: custom:button-card
+              template: zone_btn
+              name: Stop
+              icon: mdi:stop
+              tap_action:
+                action: perform-action
+                perform_action: valve.close_valve
+                target:
+                  entity_id: valve.front_garden
+    - type: custom:button-card
+      template: zone_block
+      entity: binary_sensor.side_garden_watering
+      name: Side Garden
+      custom_fields:
+        info: >-
+          [[[ const w = states['binary_sensor.side_garden_watering'].state === 'on'; const rem = states['sensor.side_garden_remaining_watering_time'].state; const n = states['sensor.side_garden_next_cycle'].state; const s = states['switch.side_garden_automatic_watering'].state === 'off'; let body; if (w) { body = `<span class="on">● ${rem}m left</span>`; } else if (s) { body = '<span>suspended</span>'; } else if (n === 'unknown' || n === 'unavailable') { body = '<span>idle</span>'; } else { const ns = new Date(n).toLocaleString('en-AU', {weekday: 'short', hour: '2-digit', minute: '2-digit'}); body = `<span>next ${ns}</span>`; } return `<div class="zone-info">${body}</div>`; ]]]
+        actions:
+          card:
+            type: horizontal-stack
+            cards:
+            - type: custom:button-card
+              template: zone_btn
+              name: 30m
+              icon: mdi:water
+              tap_action:
+                action: perform-action
+                perform_action: hydrawise.start_watering
+                data:
+                  duration: 30
+                target:
+                  entity_id: binary_sensor.side_garden_watering
+            - type: custom:button-card
+              template: zone_btn
+              name: 60m
+              icon: mdi:water
+              tap_action:
+                action: perform-action
+                perform_action: hydrawise.start_watering
+                data:
+                  duration: 60
+                target:
+                  entity_id: binary_sensor.side_garden_watering
+            - type: custom:button-card
+              template: zone_btn
+              name: 90m
+              icon: mdi:water
+              tap_action:
+                action: perform-action
+                perform_action: hydrawise.start_watering
+                data:
+                  duration: 90
+                target:
+                  entity_id: binary_sensor.side_garden_watering
+            - type: custom:button-card
+              template: zone_btn
+              name: Stop
+              icon: mdi:stop
+              tap_action:
+                action: perform-action
+                perform_action: valve.close_valve
+                target:
+                  entity_id: valve.side_garden
+    - type: custom:button-card
+      template: zone_block
+      entity: binary_sensor.front_lawn_watering
+      name: Front Lawn
+      custom_fields:
+        info: >-
+          [[[ const w = states['binary_sensor.front_lawn_watering'].state === 'on'; const rem = states['sensor.front_lawn_remaining_watering_time'].state; const n = states['sensor.front_lawn_next_cycle'].state; const s = states['switch.front_lawn_automatic_watering'].state === 'off'; let body; if (w) { body = `<span class="on">● ${rem}m left</span>`; } else if (s) { body = '<span>suspended</span>'; } else if (n === 'unknown' || n === 'unavailable') { body = '<span>idle</span>'; } else { const ns = new Date(n).toLocaleString('en-AU', {weekday: 'short', hour: '2-digit', minute: '2-digit'}); body = `<span>next ${ns}</span>`; } return `<div class="zone-info">${body}</div>`; ]]]
+        actions:
+          card:
+            type: horizontal-stack
+            cards:
+            - type: custom:button-card
+              template: zone_btn
+              name: 30m
+              icon: mdi:water
+              tap_action:
+                action: perform-action
+                perform_action: hydrawise.start_watering
+                data:
+                  duration: 30
+                target:
+                  entity_id: binary_sensor.front_lawn_watering
+            - type: custom:button-card
+              template: zone_btn
+              name: 60m
+              icon: mdi:water
+              tap_action:
+                action: perform-action
+                perform_action: hydrawise.start_watering
+                data:
+                  duration: 60
+                target:
+                  entity_id: binary_sensor.front_lawn_watering
+            - type: custom:button-card
+              template: zone_btn
+              name: 90m
+              icon: mdi:water
+              tap_action:
+                action: perform-action
+                perform_action: hydrawise.start_watering
+                data:
+                  duration: 90
+                target:
+                  entity_id: binary_sensor.front_lawn_watering
+            - type: custom:button-card
+              template: zone_btn
+              name: Stop
+              icon: mdi:stop
+              tap_action:
+                action: perform-action
+                perform_action: valve.close_valve
+                target:
+                  entity_id: valve.front_lawn
+    - type: custom:button-card
+      template: zone_block
+      entity: binary_sensor.west_lawn_watering
+      name: West Lawn
+      custom_fields:
+        info: >-
+          [[[ const w = states['binary_sensor.west_lawn_watering'].state === 'on'; const rem = states['sensor.west_lawn_remaining_watering_time'].state; const n = states['sensor.west_lawn_next_cycle'].state; const s = states['switch.west_lawn_automatic_watering'].state === 'off'; let body; if (w) { body = `<span class="on">● ${rem}m left</span>`; } else if (s) { body = '<span>suspended</span>'; } else if (n === 'unknown' || n === 'unavailable') { body = '<span>idle</span>'; } else { const ns = new Date(n).toLocaleString('en-AU', {weekday: 'short', hour: '2-digit', minute: '2-digit'}); body = `<span>next ${ns}</span>`; } return `<div class="zone-info">${body}</div>`; ]]]
+        actions:
+          card:
+            type: horizontal-stack
+            cards:
+            - type: custom:button-card
+              template: zone_btn
+              name: 30m
+              icon: mdi:water
+              tap_action:
+                action: perform-action
+                perform_action: hydrawise.start_watering
+                data:
+                  duration: 30
+                target:
+                  entity_id: binary_sensor.west_lawn_watering
+            - type: custom:button-card
+              template: zone_btn
+              name: 60m
+              icon: mdi:water
+              tap_action:
+                action: perform-action
+                perform_action: hydrawise.start_watering
+                data:
+                  duration: 60
+                target:
+                  entity_id: binary_sensor.west_lawn_watering
+            - type: custom:button-card
+              template: zone_btn
+              name: 90m
+              icon: mdi:water
+              tap_action:
+                action: perform-action
+                perform_action: hydrawise.start_watering
+                data:
+                  duration: 90
+                target:
+                  entity_id: binary_sensor.west_lawn_watering
+            - type: custom:button-card
+              template: zone_btn
+              name: Stop
+              icon: mdi:stop
+              tap_action:
+                action: perform-action
+                perform_action: valve.close_valve
+                target:
+                  entity_id: valve.west_lawn
+    - type: custom:button-card
+      template: zone_block
+      entity: binary_sensor.east_lawn_watering
+      name: East Lawn
+      custom_fields:
+        info: >-
+          [[[ const w = states['binary_sensor.east_lawn_watering'].state === 'on'; const rem = states['sensor.east_lawn_remaining_watering_time'].state; const n = states['sensor.east_lawn_next_cycle'].state; const s = states['switch.east_lawn_automatic_watering'].state === 'off'; let body; if (w) { body = `<span class="on">● ${rem}m left</span>`; } else if (s) { body = '<span>suspended</span>'; } else if (n === 'unknown' || n === 'unavailable') { body = '<span>idle</span>'; } else { const ns = new Date(n).toLocaleString('en-AU', {weekday: 'short', hour: '2-digit', minute: '2-digit'}); body = `<span>next ${ns}</span>`; } return `<div class="zone-info">${body}</div>`; ]]]
+        actions:
+          card:
+            type: horizontal-stack
+            cards:
+            - type: custom:button-card
+              template: zone_btn
+              name: 30m
+              icon: mdi:water
+              tap_action:
+                action: perform-action
+                perform_action: hydrawise.start_watering
+                data:
+                  duration: 30
+                target:
+                  entity_id: binary_sensor.east_lawn_watering
+            - type: custom:button-card
+              template: zone_btn
+              name: 60m
+              icon: mdi:water
+              tap_action:
+                action: perform-action
+                perform_action: hydrawise.start_watering
+                data:
+                  duration: 60
+                target:
+                  entity_id: binary_sensor.east_lawn_watering
+            - type: custom:button-card
+              template: zone_btn
+              name: 90m
+              icon: mdi:water
+              tap_action:
+                action: perform-action
+                perform_action: hydrawise.start_watering
+                data:
+                  duration: 90
+                target:
+                  entity_id: binary_sensor.east_lawn_watering
+            - type: custom:button-card
+              template: zone_btn
+              name: Stop
+              icon: mdi:stop
+              tap_action:
+                action: perform-action
+                perform_action: valve.close_valve
+                target:
+                  entity_id: valve.east_lawn
