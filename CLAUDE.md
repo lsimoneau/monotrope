@@ -34,10 +34,33 @@ CSS. The design should feel minimal, typographic, and monospaced-first.
 - **`apps` LXC** (192.168.0.97): Calibre-Web, Audiobookshelf, KoInsight,
   Miniflux (with its own Postgres). Reachable as
   `{calibre,abs,koinsight,reader}.monotrope.au` via Caddy on Proxmox.
+  Also runs **ops-broker** (LAN-only MCP capability broker for Hermes — see below).
 - **`hermes` LXC** (192.168.0.96): Hermes Agent (native install, not Docker)
   — Telegram + email gateways, MCP servers, browser automation sandbox.
 - **`jellyfin` LXC**, **`media-stack` LXC**: media playback + acquisition.
 - **HAOS VM**: Home Assistant.
+
+### Exposing capabilities to Hermes (capability brokers)
+
+Hermes must never get SSH, root, or a docker socket — that would break the LXC
+boundary. Privileged host operations are instead exposed through narrow, audited
+**MCP brokers** running on the managed host; Hermes is a pure MCP client behind a
+fixed, allowlisted menu.
+
+- `infra/broker_core/` — reusable scaffold (stateless streamable-HTTP MCP, bearer
+  auth, no-shell arg-list exec, journald audit, rate limiter).
+- `infra/ansible/roles/ops_broker/` — first instance, on the apps LXC. Runs as the
+  unprivileged `opsbroker` user (groups `docker` + `systemd-journal`, no root),
+  bound to the LAN IP only. Tools: `list_services`, `service_status`, `get_logs`,
+  `restart_service`, driven by the `ops_broker_services` allowlist in inventory
+  (`restartable` gates remediations). Audit trail: `journalctl -u ops-broker`.
+
+**Where a new capability goes (by privilege, not "which broker"):** ops/lifecycle
+→ ops-broker (keep it narrow — never add app-domain tools); app action via an
+authenticated API → a Hermes *plugin* (Miniflux pattern, no host privilege); app
+action needing host execution → a *new* broker instance reusing `broker_core`.
+Handlers stay hand-written and parameter-validated — never a generic "run any
+command" tool.
 
 ## Conventions
 
