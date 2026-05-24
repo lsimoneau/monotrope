@@ -1,0 +1,113 @@
+---
+# Deploy the ops-broker: a broker_core instance running as the unprivileged
+# `opsbroker` user. Mirrors the hermes role's idioms (uv venv, env-file split
+# for secrets, systemd unit + handlers). Idempotent throughout.
+
+- name: Install runtime dependencies
+  ansible.builtin.apt:
+    name:
+      - python3
+      - python3-venv
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install uv
+  ansible.builtin.shell: |
+    set -euo pipefail
+    curl -LsSf https://astral.sh/uv/install.sh \
+      | env UV_INSTALL_DIR=/usr/local/bin UV_NO_MODIFY_PATH=1 sh
+  args:
+    creates: /usr/local/bin/uv
+    executable: /bin/bash
+
+- name: Create ops-broker system user (docker + journal access via groups, no root)
+  ansible.builtin.user:
+    name: "{{ ops_broker_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    home: "{{ ops_broker_dir }}"
+    create_home: false
+    groups:
+      - docker
+      - systemd-journal
+    append: true
+
+- name: Ensure ops-broker directory exists
+  ansible.builtin.file:
+    path: "{{ ops_broker_dir }}"
+    state: directory
+    owner: "{{ ops_broker_user }}"
+    group: "{{ ops_broker_user }}"
+    mode: '0750'
+
+- name: Sync broker_core source to host
+  ansible.builtin.copy:
+    src: "{{ broker_core_src }}/"
+    dest: "{{ ops_broker_dir }}/broker_core_src/"
+    owner: root
+    group: "{{ ops_broker_user }}"
+    mode: '0644'
+    directory_mode: '0755'
+  register: broker_core_sync
+
+- name: Create venv via uv
+  ansible.builtin.command: uv venv --python 3.11 .venv
+  args:
+    chdir: "{{ ops_broker_dir }}"
+    creates: "{{ ops_broker_dir }}/.venv/bin/python"
+
+- name: Install broker_core into venv
+  ansible.builtin.command: uv pip install --reinstall ./broker_core_src
+  args:
+    chdir: "{{ ops_broker_dir }}"
+  environment:
+    VIRTUAL_ENV: "{{ ops_broker_dir }}/.venv"
+  when: broker_core_sync.changed
+  notify: Restart ops-broker
+
+- name: Install server.py
+  ansible.builtin.copy:
+    src: server.py
+    dest: "{{ ops_broker_dir }}/server.py"
+    owner: root
+    group: "{{ ops_broker_user }}"
+    mode: '0644'
+  notify: Restart ops-broker
+
+- name: Render broker config (service allowlist + limits)
+  ansible.builtin.template:
+    src: ops-broker.config.json.j2
+    dest: "{{ ops_broker_dir }}/config.json"
+    owner: root
+    group: "{{ ops_broker_user }}"
+    mode: '0640'
+  notify: Restart ops-broker
+
+- name: Write ops-broker environment file (bearer token)
+  ansible.builtin.template:
+    src: ops-broker.env.j2
+    dest: /etc/default/ops-broker
+    owner: root
+    group: "{{ ops_broker_user }}"
+    mode: '0640'
+  no_log: true
+  notify: Restart ops-broker
+
+- name: Install ops-broker systemd unit
+  ansible.builtin.template:
+    src: ops-broker.service.j2
+    dest: /etc/systemd/system/ops-broker.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Reload systemd
+    - Restart ops-broker
+
+- name: Enable and start ops-broker
+  ansible.builtin.systemd:
+    name: ops-broker
+    enabled: true
+    state: started
+    daemon_reload: true

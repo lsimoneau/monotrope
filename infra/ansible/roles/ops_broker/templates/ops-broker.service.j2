@@ -1,0 +1,22 @@
+[Unit]
+Description=ops-broker (Hermes capability broker — logs/status/restart)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ ops_broker_user }}
+Group={{ ops_broker_user }}
+EnvironmentFile=/etc/default/ops-broker
+ExecStart={{ ops_broker_dir }}/.venv/bin/python {{ ops_broker_dir }}/server.py
+WorkingDirectory={{ ops_broker_dir }}
+Restart=on-failure
+RestartSec=5
+# NoNewPrivileges blocks any setuid escalation; PrivateTmp isolates /tmp.
+# (ProtectSystem=strict is deliberately omitted — it interferes with reaching
+# the docker socket, and the LXC + unprivileged user are the real boundary.)
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

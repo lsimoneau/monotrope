@@ -21,3 +21,6 @@ tailscale_auth_key: "{{ vault_tailscale_auth_key }}"
 cloudflare_dns_api_token: "{{ vault_cloudflare_dns_api_token }}"
 proton_wg_private_key: "{{ vault_proton_wg_private_key }}"
 pihole_web_password: "{{ vault_pihole_web_password }}"
+# Shared bearer token: the ops-broker (server) and Hermes' mcp_servers (client)
+# both reference this single source.
+ops_broker_token: "{{ vault_ops_broker_token }}"

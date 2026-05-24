@@ -72,12 +72,13 @@
     force: true
 
 - name: Stage config.yaml
-  ansible.builtin.copy:
-    src: config.yaml
+  ansible.builtin.template:
+    src: config.yaml.j2
     dest: "{{ hermes_home }}/config.yaml"
     owner: root
     group: root
     mode: '0600'
+  no_log: true  # rendered file carries the ops-broker bearer token
   notify: Restart hermes-gateway
 
 - name: Stage plugins directory

@@ -1,0 +1,25 @@
+---
+# ops-broker: the lifecycle/observability capability surface for a host.
+# First instance of the shared broker_core scaffold. Runs as an unprivileged
+# system user whose only powers come from group membership (docker +
+# systemd-journal) — no root, no sudo.
+
+ops_broker_user: opsbroker
+ops_broker_dir: /opt/ops-broker
+
+# Bind to this host's LAN IP only (never 0.0.0.0). Hermes reaches it over the LAN.
+ops_broker_bind: "{{ ansible_host }}"
+ops_broker_port: 9988
+
+# Limits surfaced into the rendered config and enforced by the server.
+ops_broker_max_lines: 1000
+ops_broker_restart_cooldown: 60     # min seconds between restarts of one service
+ops_broker_restart_per_hour: 6      # cap per service per rolling hour
+
+# Shared scaffold source, relative to the playbook dir (infra/ansible →
+# ../broker_core = infra/broker_core). Copied to the host and installed into the venv.
+broker_core_src: "{{ playbook_dir }}/../broker_core"
+
+# Per-host service allowlist. Define in inventory/host_vars. Empty default means
+# an unconfigured host runs a broker that manages nothing (safe), never errors.
+ops_broker_services: {}

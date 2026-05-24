@@ -1,0 +1,8 @@
+{
+  "services": {{ ops_broker_services | to_nice_json | indent(2) }},
+  "limits": {
+    "max_lines": {{ ops_broker_max_lines }},
+    "restart_cooldown": {{ ops_broker_restart_cooldown }},
+    "restart_per_hour": {{ ops_broker_restart_per_hour }}
+  }
+}

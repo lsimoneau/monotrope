@@ -39,6 +39,8 @@
     - audible_ingest
     - koinsight
     - miniflux
+    - role: ops_broker
+      tags: [ops_broker]
 
 - name: Provision hermes LXC
   hosts: hermes
