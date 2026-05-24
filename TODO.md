@@ -3,6 +3,33 @@
 Project-level backlog. Things that are real but not in flight. Move to a
 plan or branch when picking one up.
 
+## Hermes config.yaml is clobbered on deploy (make config non-destructive)
+
+`make home LIMIT=hermes` renders `roles/hermes/templates/config.yaml.j2` straight
+over `/root/.hermes/config.yaml`, so anything written *on the box* gets squashed
+back to our template: user edits, a `hermes` self-update migrating the config, and
+especially `hermes mcp add` / `hermes tools` (which persist `mcp_servers`,
+`platform_toolsets`, `known_plugin_toolsets` into that same file). The deploy should
+set only the keys we own and leave everything else intact — same spirit as the
+skills seeds `cp -rn` no-clobber.
+
+This is pre-existing (config.yaml was a full `copy:` before the ops-broker change
+too); the broker work just made it bite, because the box's config now legitimately
+diverges from the repo.
+
+Candidate approaches (pick when picking it up):
+
+- **Register the broker via Hermes' own CLI instead of templating the whole file.**
+  `hermes mcp add apps_ops --url …` (idempotent, non-interactive) so Hermes does the
+  targeted edit, and seed `config.yaml` no-clobber for first boot only. Cleanest —
+  delegates merge semantics to Hermes. Confirm: an auth-header/token flag exists, the
+  add is re-runnable without dup/error, and accept that the token lands in argv.
+- **Deep-merge in Ansible.** `slurp` the remote config, `combine(recursive=True)` our
+  managed dict over it, write back. Keeps Ansible authoritative for our keys without
+  dropping on-box additions; list merges (e.g. `tools.include`) need care.
+- **Config drop-in**, if Hermes supports includes / a `config.d`. Own a separate file
+  for `mcp_servers`, leave `config.yaml` unmanaged. Confirm Hermes supports layering.
+
 ## Pi-hole HA DNS (deferred — needs second physical node)
 
 Make DNS survive the OptiPlex going down. Two Pi-hole nodes (second on
