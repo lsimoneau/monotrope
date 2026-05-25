@@ -71,14 +71,28 @@
     state: link
     force: true
 
-- name: Stage config.yaml
-  ansible.builtin.template:
-    src: config.yaml.j2
-    dest: "{{ hermes_home }}/config.yaml"
-    owner: root
-    group: root
-    mode: '0600'
-  no_log: true  # rendered file carries the ops-broker bearer token
+- name: Configure hermes static settings via hermes config set
+  ansible.builtin.shell: |
+    set -euo pipefail
+
+    hermes config set memory.memory_enabled true
+    hermes config set memory.user_profile_enabled true
+
+    hermes config set agent.max_turns 70
+
+    hermes config set TELEGRAM_HOME_CHANNEL 8455090116
+    hermes config set EMAIL_HOME_CHANNEL louis@monotrope.au
+
+    # MCP server for apps_ops broker — tools.allowlist omitted so the full
+    # broker toolset is discovered on connect and future tools are picked up on
+    # /reload-mcp without a config change.
+    hermes config set mcp_servers.apps_ops.url "http://{{ hostvars['apps'].ansible_host }}:9988/mcp"
+    hermes config set mcp_servers.apps_ops.headers.Authorization "Bearer {{ ops_broker_token }}"
+    hermes config set mcp_servers.apps_ops.tools.prompts false
+    hermes config set mcp_servers.apps_ops.tools.resources false
+  args:
+    executable: /bin/bash  # set -o pipefail is a bashism; default /bin/sh is dash
+  no_log: true
   notify: Restart hermes-gateway
 
 - name: Stage plugins directory
