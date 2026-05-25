@@ -25,8 +25,10 @@ configure_audit(BROKER)
 
 _CONFIG = json.load(open(os.environ["OPS_BROKER_CONFIG"], encoding="utf-8"))
 SERVICES: dict[str, dict] = _CONFIG["services"]
+FILES: dict[str, dict] = _CONFIG.get("files", {})
 _LIMITS: dict = _CONFIG.get("limits", {})
 MAX_LINES = int(_LIMITS.get("max_lines", 1000))
+MAX_FILE_BYTES = int(_LIMITS.get("max_file_bytes", 256 * 1024))
 RESTART_COOLDOWN = int(_LIMITS.get("restart_cooldown", 60))
 RESTART_PER_HOUR = int(_LIMITS.get("restart_per_hour", 6))
 
@@ -79,6 +81,72 @@ def _since_to_dt(since: str) -> _dt.datetime | None:
     return _dt.datetime.now() - _dt.timedelta(seconds=seconds)
 
 
+# Properties that capture the *last run*'s outcome for a systemd unit — the
+# signal that tells a oneshot which exited non-zero from one that's merely
+# inactive between timer firings (where `is-active` alone says little).
+_UNIT_PROPS = (
+    "ActiveState,SubState,Result,ExecMainStatus,"
+    "ExecMainStartTimestamp,ExecMainExitTimestamp,NRestarts"
+)
+
+
+def _unit_health(unit: str) -> dict:
+    res = run_argv(["systemctl", "show", unit, "--property=" + _UNIT_PROPS], timeout=10)
+    props: dict[str, str] = {}
+    for line in res.output.splitlines():
+        key, _, value = line.partition("=")
+        props[key] = value
+    return {
+        "status": props.get("ActiveState", "unknown"),
+        "sub_state": props.get("SubState", ""),
+        "result": props.get("Result", ""),  # 'success', 'exit-code', ...
+        "exit_code": props.get("ExecMainStatus", ""),
+        "started_at": props.get("ExecMainStartTimestamp", ""),
+        "finished_at": props.get("ExecMainExitTimestamp", ""),
+        "restarts": props.get("NRestarts", ""),
+    }
+
+
+def _docker_health(target: str) -> dict:
+    # One inspect call: restart count (top-level) + the whole State object,
+    # tab-separated. State carries ExitCode/OOMKilled/timestamps and, if the
+    # image declares a HEALTHCHECK, a nested Health.Status.
+    res = run_argv(
+        ["docker", "inspect", "-f", "{{.RestartCount}}\t{{json .State}}", target],
+        timeout=10,
+    )
+    if res.returncode != 0:
+        return {"status": "unknown", "error": res.output.strip()}
+    restarts, _, state_json = res.output.strip().partition("\t")
+    try:
+        state = json.loads(state_json)
+    except json.JSONDecodeError:
+        return {"status": "unknown"}
+    health = state["Health"]["Status"] if isinstance(state.get("Health"), dict) else ""
+    return {
+        "status": state.get("Status", "unknown"),
+        "exit_code": state.get("ExitCode", ""),
+        "started_at": state.get("StartedAt", ""),
+        "finished_at": state.get("FinishedAt", ""),
+        "restarts": restarts,
+        "health": health,
+        "oom_killed": bool(state.get("OOMKilled", False)),
+    }
+
+
+def _read_tail(path: str, max_bytes: int) -> tuple[str, bool, int]:
+    """Read the trailing ``max_bytes`` of a host-readable file, no subprocess."""
+    try:
+        size = os.path.getsize(path)
+        with open(path, "rb") as fh:
+            if size > max_bytes:
+                fh.seek(-max_bytes, os.SEEK_END)
+            data = fh.read(max_bytes)
+        return data.decode("utf-8", "replace"), size > max_bytes, 0
+    except OSError as exc:
+        return str(exc), False, 1
+
+
 @mcp.tool(
     name="list_services",
     description=(
@@ -119,6 +187,26 @@ def service_status(service: str) -> str:
             "status": status,
         }
     )
+
+
+@mcp.tool(
+    name="service_health",
+    description=(
+        "Deeper health for one managed service than service_status: the last "
+        "run's result and exit code, when it last started/finished, restart "
+        "count, and (docker) health-check + OOM state. Use this to tell a "
+        "service that merely *exists* from one whose last run failed — e.g. a "
+        "timer-driven sweep whose container is 'up' but which exited non-zero."
+    ),
+)
+def service_health(service: str) -> str:
+    entry = SERVICES.get(service)
+    if not entry:
+        audit("service_health", {"service": service}, "deny", reason="unknown service")
+        return _err(f"unknown service '{service}'")
+    health = _docker_health(entry["target"]) if entry["source"] == "docker" else _unit_health(entry["target"])
+    audit("service_health", {"service": service}, "allow", status=health.get("status"))
+    return json.dumps({"service": service, "source": entry["source"], **health})
 
 
 @mcp.tool(
@@ -165,6 +253,51 @@ def get_logs(service: str, lines: int = 100, since: str | None = None) -> str:
             "output": res.output,
         }
     )
+
+
+@mcp.tool(
+    name="list_files",
+    description=(
+        "List the diagnostic files this broker can read, by friendly name. For "
+        "state/log files that live outside journald and docker logs (e.g. inside "
+        "a container volume). The agent never names a raw path — only these keys."
+    ),
+)
+def list_files() -> str:
+    names = sorted(FILES)
+    audit("list_files", {}, "allow", count=len(names))
+    return json.dumps({"files": names})
+
+
+@mcp.tool(
+    name="read_file",
+    description=(
+        "Read an allowlisted diagnostic file by its friendly name (see "
+        "list_files). Read-only; returns the file's tail capped to the broker's "
+        "byte limit."
+    ),
+)
+def read_file(name: str) -> str:
+    entry = FILES.get(name)
+    if not entry:
+        audit("read_file", {"file": name}, "deny", reason="unknown file")
+        return _err(f"unknown file '{name}'")
+
+    if entry.get("container"):
+        # Read from inside a container volume. tail -c bounds the bytes the exec
+        # emits, so a huge file never has to be buffered whole.
+        res = run_argv(
+            ["docker", "exec", entry["container"], "tail", "-c", str(MAX_FILE_BYTES), entry["path"]],
+            timeout=15,
+            max_bytes=MAX_FILE_BYTES,
+        )
+        output, rc = res.output, res.returncode
+        truncated = res.truncated or len(output.encode("utf-8", "replace")) >= MAX_FILE_BYTES
+    else:
+        output, truncated, rc = _read_tail(entry["path"], MAX_FILE_BYTES)
+
+    audit("read_file", {"file": name}, "allow", rc=rc)
+    return json.dumps({"file": name, "returncode": rc, "truncated": truncated, "output": output})
 
 
 @mcp.tool(

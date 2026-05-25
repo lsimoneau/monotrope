@@ -13,6 +13,7 @@ ops_broker_port: 9988
 
 # Limits surfaced into the rendered config and enforced by the server.
 ops_broker_max_lines: 1000
+ops_broker_max_file_bytes: 262144   # 256 KiB cap on read_file output (tail)
 ops_broker_restart_cooldown: 60     # min seconds between restarts of one service
 ops_broker_restart_per_hour: 6      # cap per service per rolling hour
 
@@ -23,3 +24,8 @@ broker_core_src: "{{ playbook_dir }}/../broker_core"
 # Per-host service allowlist. Define in inventory/host_vars. Empty default means
 # an unconfigured host runs a broker that manages nothing (safe), never errors.
 ops_broker_services: {}
+
+# Per-host diagnostic-file allowlist for read_file. Each key maps to either
+# {container, path} (read from inside a container volume via docker exec) or
+# {path} (a host-readable file). Empty default = read_file exposes nothing.
+ops_broker_files: {}

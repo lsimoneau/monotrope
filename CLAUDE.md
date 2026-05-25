@@ -51,9 +51,16 @@ fixed, allowlisted menu.
   auth, no-shell arg-list exec, journald audit, rate limiter).
 - `infra/ansible/roles/ops_broker/` — first instance, on the apps LXC. Runs as the
   unprivileged `opsbroker` user (groups `docker` + `systemd-journal`, no root),
-  bound to the LAN IP only. Tools: `list_services`, `service_status`, `get_logs`,
-  `restart_service`, driven by the `ops_broker_services` allowlist in inventory
-  (`restartable` gates remediations). Audit trail: `journalctl -u ops-broker`.
+  bound to the LAN IP only. Tools: `list_services`, `service_status`,
+  `service_health` (last-run result/exit code for units; exit code/health/OOM for
+  containers), `get_logs`, `restart_service`, plus `list_files`/`read_file` (tail
+  of an allowlisted diagnostic file, incl. files inside a container volume).
+  Driven by the `ops_broker_services` and `ops_broker_files` allowlists in
+  inventory (`restartable` gates remediations). Audit trail: `journalctl -u ops-broker`.
+  Note: a timer-driven sidecar (a container `docker exec`'d by a oneshot, e.g.
+  `audible-ingest`) must be sourced `journal`→`<unit>.service`, not `docker`: its
+  container PID 1 is idle, so docker logs are empty and the real pass/fail is the
+  unit's. `service_health` is the tool that surfaces such a failed sweep.
 
 **Where a new capability goes (by privilege, not "which broker"):** ops/lifecycle
 → ops-broker (keep it narrow — never add app-domain tools); app action via an

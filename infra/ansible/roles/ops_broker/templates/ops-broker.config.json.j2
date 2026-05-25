@@ -1,7 +1,9 @@
 {
   "services": {{ ops_broker_services | to_nice_json | indent(2) }},
+  "files": {{ ops_broker_files | to_nice_json | indent(2) }},
   "limits": {
     "max_lines": {{ ops_broker_max_lines }},
+    "max_file_bytes": {{ ops_broker_max_file_bytes }},
     "restart_cooldown": {{ ops_broker_restart_cooldown }},
     "restart_per_hour": {{ ops_broker_restart_per_hour }}
   }
