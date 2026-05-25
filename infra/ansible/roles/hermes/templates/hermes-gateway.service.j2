@@ -12,9 +12,10 @@ WorkingDirectory={{ hermes_home }}
 Restart=on-failure
 RestartSec=5
 # Don't kill the process group on stop — let hermes shut its gateways down
-# gracefully so in-flight Telegram/email replies aren't truncated.
+# gracefully so in-flight Telegram/email replies aren't truncated. Must exceed
+# Hermes' agent.restart_drain_timeout (180s) or systemd SIGKILLs mid-drain.
 KillMode=mixed
-TimeoutStopSec=30
+TimeoutStopSec=210
 
 [Install]
 WantedBy=multi-user.target
