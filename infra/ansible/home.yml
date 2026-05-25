@@ -36,7 +36,8 @@
     - docker
     - calibre_web
     - audiobookshelf
-    - audible_ingest
+    - role: audible_ingest
+      tags: [audible_ingest]
     - koinsight
     - miniflux
     - role: ops_broker

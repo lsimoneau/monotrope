@@ -30,6 +30,12 @@ STATE = STATE_DIR / "state.json"
 TERMINAL = {"imported", "pinned"}
 ILLEGAL_FS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
+
+class NotDownloadable(Exception):
+    """Audible lists the title in the library but serves no downloadable asset
+    in any format (typically Plus-catalogue / streaming-only). Recorded once as
+    'skipped' so it isn't retried as a hard error on every sweep."""
+
 # Inter-download throttle. Jitter (uniform between SLEEP_MIN and SLEEP_MAX)
 # avoids the perfectly-cadenced fingerprint of a script. MAX_PER_RUN caps
 # how many new downloads a single sweep does — drip-feed via the timer to
@@ -80,7 +86,9 @@ def book_folder(author: str, title: str) -> Path:
 
 
 def already_have(folder: Path) -> bool:
-    return folder.is_dir() and any(folder.glob("*.m4b"))
+    # rglob, not glob: audible-cli nests multi-part/series titles one level
+    # deeper, so a decrypted .m4b can live in a per-title subfolder.
+    return folder.is_dir() and any(folder.rglob("*.m4b"))
 
 
 def decrypt_aaxc(aaxc: Path, voucher: Path, out: Path) -> None:
@@ -95,30 +103,83 @@ def decrypt_aaxc(aaxc: Path, voucher: Path, out: Path) -> None:
     )
 
 
-def download_and_decrypt(asin: str, folder: Path) -> int:
-    folder.mkdir(parents=True, exist_ok=True)
+_ACTIVATION_BYTES: str | None = None
+
+
+def activation_bytes() -> str:
+    """Account-wide AAX decryption key, fetched once and memoised. Legacy AAX
+    (unlike AAXC, which ships a per-book voucher) is decrypted with these
+    four bytes."""
+    global _ACTIVATION_BYTES
+    if _ACTIVATION_BYTES is None:
+        res = subprocess.run(
+            ["audible", "activation-bytes"], capture_output=True, text=True, check=True
+        )
+        tokens = re.findall(r"\b[0-9a-fA-F]{8}\b", f"{res.stdout}\n{res.stderr}")
+        if not tokens:
+            raise RuntimeError("could not obtain activation_bytes for AAX decrypt")
+        _ACTIVATION_BYTES = tokens[-1].lower()
+    return _ACTIVATION_BYTES
+
+
+def decrypt_aax(aax: Path, out: Path) -> None:
     subprocess.run(
+        ["ffmpeg", "-y", "-loglevel", "error",
+         "-activation_bytes", activation_bytes(),
+         "-i", str(aax), "-c", "copy", str(out)],
+        check=True,
+    )
+
+
+def _audible_download(asin: str, folder: Path, fmt: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
         ["audible", "download",
-         "--asin", asin,
-         "--aaxc",
+         "--asin", asin, fmt,
          "--output-dir", str(folder),
          "--ignore-errors", "--no-confirm",
          "--filename-mode", "ascii"],
-        check=True,
+        capture_output=True, text=True,
     )
-    aaxc_files = sorted(folder.glob("*.aaxc"))
-    if not aaxc_files:
-        raise RuntimeError(f"no .aaxc downloaded for {asin}")
+
+
+def download_and_decrypt(asin: str, folder: Path) -> int:
+    folder.mkdir(parents=True, exist_ok=True)
+
+    # Prefer AAXC (per-book voucher, better quality). A minority of older titles
+    # have no AAXC asset — the API 404s on asset details — but do offer legacy
+    # AAX, so fall back to it explicitly rather than flipping the default for
+    # every title. `audible`'s own --aax-fallback prefers AAX, which we don't want.
+    out = ""
+    for fmt in ("--aaxc", "--aax"):
+        proc = _audible_download(asin, folder, fmt)
+        out += f"{proc.stdout}\n{proc.stderr}\n"
+        if list(folder.rglob("*.aaxc")) or list(folder.rglob("*.aax")):
+            break
+        if "not downloadable" in out.lower():
+            break
+    sys.stdout.write(out)  # keep audible-cli's output in the journal
+
+    # rglob: series/multi-part titles are nested in a per-title subfolder.
+    aaxc_files = sorted(folder.rglob("*.aaxc"))
+    aax_files = sorted(folder.rglob("*.aax"))
+    if not aaxc_files and not aax_files:
+        if "not downloadable" in out.lower():
+            raise NotDownloadable(asin)
+        raise RuntimeError(f"no .aaxc/.aax downloaded for {asin}")
+
     decrypted = 0
     for aaxc in aaxc_files:
         voucher = aaxc.with_suffix(".voucher")
         if not voucher.exists():
             print(f"WARN: missing voucher for {aaxc.name}", file=sys.stderr)
             continue
-        m4b = aaxc.with_suffix(".m4b")
-        decrypt_aaxc(aaxc, voucher, m4b)
+        decrypt_aaxc(aaxc, voucher, aaxc.with_suffix(".m4b"))
         aaxc.unlink()
         voucher.unlink()
+        decrypted += 1
+    for aax in aax_files:
+        decrypt_aax(aax, aax.with_suffix(".m4b"))
+        aax.unlink()
         decrypted += 1
     if decrypted == 0:
         raise RuntimeError(f"no parts decrypted for {asin}")
@@ -130,7 +191,7 @@ def main() -> int:
     state = json.loads(STATE.read_text()) if STATE.exists() else {}
 
     library = audible_library()
-    counts = dict(downloaded=0, already=0, errors=0)
+    counts = dict(downloaded=0, already=0, skipped=0, errors=0)
 
     for item in library:
         asin = item.get("asin")
@@ -140,7 +201,14 @@ def main() -> int:
         author = first_author(item)
         folder = book_folder(author, title)
 
-        if state.get(asin, {}).get("status") in TERMINAL and already_have(folder):
+        status = state.get(asin, {}).get("status")
+        if status in TERMINAL and already_have(folder):
+            continue
+        # Titles Audible won't serve in any downloadable format: recorded once,
+        # not retried as an error every sweep. Delete the entry from state.json
+        # to re-check (e.g. after buying a credit for a Plus-catalogue title).
+        if status == "skipped":
+            counts["skipped"] += 1
             continue
 
         if already_have(folder):
@@ -160,6 +228,16 @@ def main() -> int:
             }
             counts["downloaded"] += 1
             time.sleep(random.uniform(SLEEP_MIN, SLEEP_MAX))
+        except NotDownloadable:
+            state[asin] = {
+                "status": "skipped", "title": title, "author": author,
+                "reason": "not downloadable", "checked_at": int(time.time()),
+            }
+            counts["skipped"] += 1
+            print(f"SKIP: {asin} {title!r}: not downloadable (streaming-only?)",
+                  file=sys.stderr)
+            if folder.is_dir() and not any(folder.iterdir()):
+                shutil.rmtree(folder)
         except (subprocess.CalledProcessError, RuntimeError) as e:
             counts["errors"] += 1
             print(f"ERROR: {asin} {title!r}: {e}", file=sys.stderr)

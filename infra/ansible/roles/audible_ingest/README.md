@@ -6,9 +6,25 @@ so a host-side systemd timer can `docker exec` the sweep daily without paying
 container-start overhead.
 
 The sweep lists the Audible library via `audible-cli`, downloads anything
-missing into `/audiobooks/<Author>/<Title>/<Title>.m4b`, decrypts the `.aaxc`
-with its per-book voucher, and writes state to `/var/lib/audible-ingest/state.json`
-keyed by ASIN.
+missing under `/audiobooks/<Author>/<Title>/`, decrypts it, and writes state to
+`/var/lib/audible-ingest/state.json` keyed by ASIN.
+
+Format handling:
+
+- **AAXC** is preferred (better quality; ships a per-book `.voucher` whose
+  key/iv decrypts it). This covers the vast majority of titles.
+- **AAX fallback** — a minority of older titles have no AAXC asset (the API
+  404s on asset details) but still offer legacy AAX. The sweep retries those
+  with `--aax` and decrypts with the account-wide `activation_bytes`. (Note:
+  `audible`'s own `--aax-fallback` flag *prefers* AAX, which we don't want — so
+  the role does its own AAXC-first, AAX-second passes.)
+- **Series / multi-part** titles are nested by `audible-cli` in a per-title
+  subfolder, so the layout match and the `.aaxc`/`.aax` search are recursive.
+- **Not downloadable** — titles Audible serves only as a stream (Plus catalogue)
+  fail to download in either format. These are recorded once as
+  `"status": "skipped"` and not retried as an error every sweep (which would
+  otherwise leave the service permanently `failed`). Delete the ASIN's entry
+  from `state.json` to re-check it — e.g. after buying a credit to own it.
 
 ## First-time auth (once per install)
 
@@ -58,7 +74,7 @@ daily 25-cap exists for a reason, so prefer the timer for bulk imports.
 # What's the timer doing?
 ssh root@192.168.0.97 systemctl list-timers audible-ingest.timer
 
-# State (per-ASIN status keyed by imported/pinned)
+# State (per-ASIN status: imported / pinned / skipped)
 ssh root@192.168.0.97 \
   docker exec audible-ingest-audible-ingest-1 \
     cat /var/lib/audible-ingest/state.json | jq
