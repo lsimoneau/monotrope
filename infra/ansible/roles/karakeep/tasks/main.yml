@@ -1,0 +1,44 @@
+---
+- name: Ensure karakeep directory
+  ansible.builtin.file:
+    path: "{{ karakeep_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Render compose.yml
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ karakeep_dir }}/compose.yml"
+    owner: root
+    group: root
+    mode: '0644'
+  register: karakeep_compose
+
+- name: Render .env
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ karakeep_dir }}/.env"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+  register: karakeep_env
+
+- name: Bring up karakeep
+  ansible.builtin.command:
+    cmd: docker compose up -d --pull always --remove-orphans
+    chdir: "{{ karakeep_dir }}"
+  register: karakeep_up
+  changed_when: >-
+    'Started' in karakeep_up.stderr
+    or 'Created' in karakeep_up.stderr
+    or 'Recreate' in karakeep_up.stderr
+
+- name: Restart karakeep if compose or env changed
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate
+    chdir: "{{ karakeep_dir }}"
+  when: karakeep_compose.changed or karakeep_env.changed
+  changed_when: true

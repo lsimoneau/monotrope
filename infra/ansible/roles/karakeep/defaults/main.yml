@@ -1,0 +1,7 @@
+---
+karakeep_dir: /opt/karakeep
+karakeep_image: ghcr.io/karakeep-app/karakeep:release
+karakeep_chrome_image: gcr.io/zenika-hub/alpine-chrome:124
+karakeep_meili_image: getmeili/meilisearch:v1.41.0
+karakeep_port: 3002
+karakeep_base_url: https://bookmarks.monotrope.au

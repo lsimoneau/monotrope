@@ -40,6 +40,8 @@
       tags: [audible_ingest]
     - koinsight
     - miniflux
+    - role: karakeep
+      tags: [karakeep]
     - role: ops_broker
       tags: [ops_broker]
 
