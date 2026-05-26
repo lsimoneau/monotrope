@@ -1,9 +1,11 @@
 # monotrope
 
-Personal blog and server infrastructure for monotrope.au. Hugo site on
-Cloudflare Pages plus a fleet of self-hosted services on a homelab
-Proxmox host, all provisioned via Ansible. Background and conventions
-live in `CLAUDE.md`.
+This is two things:
+
+* Hugo site for a personal blog and reading log for monotrope.au, hosted on Cloudflare Pages.
+* Home server infrastructure provisioned via Ansible
+
+Background and conventions live in `CLAUDE.md`.
 
 ## Running services
 
