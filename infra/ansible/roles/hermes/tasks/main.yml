@@ -18,10 +18,28 @@
       - git
       - python3
       - python3-venv
+      - python3-yaml
       - ripgrep           # skill search
     state: present
     update_cache: true
     cache_valid_time: 3600
+
+- name: Add GitHub CLI apt repository
+  ansible.builtin.shell: |
+    set -euo pipefail
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+      | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+      > /etc/apt/sources.list.d/github-cli.list
+  args:
+    creates: /etc/apt/sources.list.d/github-cli.list
+    executable: /bin/bash
+
+- name: Install gh CLI
+  ansible.builtin.apt:
+    name: gh
+    state: present
+    update_cache: true
 
 - name: Install uv
   ansible.builtin.shell: |
@@ -90,8 +108,26 @@
     hermes config set mcp_servers.apps_ops.headers.Authorization "Bearer {{ ops_broker_token }}"
     hermes config set mcp_servers.apps_ops.tools.prompts false
     hermes config set mcp_servers.apps_ops.tools.resources false
+
   args:
     executable: /bin/bash  # set -o pipefail is a bashism; default /bin/sh is dash
+  no_log: true
+  notify: Restart hermes-gateway
+
+- name: Set terminal.env_passthrough as a YAML list
+  ansible.builtin.shell: |
+    set -euo pipefail
+    python3 -c "
+    import yaml
+    p = '{{ hermes_home }}/config.yaml'
+    with open(p) as f:
+        c = yaml.safe_load(f)
+    c.setdefault('terminal', {})['env_passthrough'] = ['GITHUB_TOKEN', 'GH_TOKEN']
+    with open(p, 'w') as f:
+        yaml.dump(c, f, default_flow_style=False)
+    "
+  args:
+    executable: /bin/bash
   no_log: true
   notify: Restart hermes-gateway
 
