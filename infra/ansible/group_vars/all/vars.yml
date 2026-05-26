@@ -10,7 +10,7 @@ hermes_email_allowed_users: simoneau.louis@gmail.com,louissimoneau@fastmail.com,
 miniflux_db_password: "{{ vault_miniflux_db_password }}"
 miniflux_admin_user: "{{ vault_miniflux_admin_user }}"
 miniflux_admin_password: "{{ vault_miniflux_admin_password }}"
-hermes_openrouter_api_key: "{{ vault_hermes_openrouter_api_key }}"
+openrouter_api_key: "{{ vault_openrouter_api_key }}"
 hermes_telegram_bot_token: "{{ vault_hermes_telegram_bot_token }}"
 hermes_telegram_allowed_users: "{{ vault_hermes_telegram_allowed_users }}"
 hermes_miniflux_api_key: "{{ vault_hermes_miniflux_api_key }}"
@@ -24,3 +24,4 @@ pihole_web_password: "{{ vault_pihole_web_password }}"
 # Shared bearer token: the ops-broker (server) and Hermes' mcp_servers (client)
 # both reference this single source.
 ops_broker_token: "{{ vault_ops_broker_token }}"
+
