@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily restic backup to Wasabi S3
+
+[Timer]
+OnCalendar={{ restic_oncalendar }}
+RandomizedDelaySec=900
+Persistent=true
+
+[Install]
+WantedBy=timers.target

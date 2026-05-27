@@ -1,0 +1,112 @@
+---
+# Install restic on the Proxmox host and deploy a centralised backup script
+# that mounts LXC filesystems, dumps databases, and uploads to Wasabi S3.
+
+- name: Check if restic is installed
+  ansible.builtin.command: restic version
+  register: restic_installed
+  failed_when: false
+  changed_when: false
+
+- name: Install restic
+  when: restic_installed.rc != 0 or restic_version not in restic_installed.stdout
+  block:
+    - name: Download restic
+      ansible.builtin.get_url:
+        url: "https://github.com/restic/restic/releases/download/v{{ restic_version }}/restic_{{ restic_version }}_linux_amd64.bz2"
+        dest: "/tmp/restic_{{ restic_version }}.bz2"
+        mode: "0644"
+
+    - name: Extract restic binary
+      ansible.builtin.shell:
+        cmd: "bzcat /tmp/restic_{{ restic_version }}.bz2 > {{ restic_install_dir }}/restic"
+      changed_when: true
+
+    - name: Make restic executable
+      ansible.builtin.file:
+        path: "{{ restic_install_dir }}/restic"
+        mode: "0755"
+
+    - name: Clean up download
+      ansible.builtin.file:
+        path: "/tmp/restic_{{ restic_version }}.bz2"
+        state: absent
+
+- name: Ensure restic cache directory
+  ansible.builtin.file:
+    path: /var/cache/restic
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Ensure dump directory
+  ansible.builtin.file:
+    path: "{{ restic_dump_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Deploy backup environment file
+  ansible.builtin.template:
+    src: restic-backup.env.j2
+    dest: "{{ restic_install_dir }}/restic-backup.env"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Deploy backup script
+  ansible.builtin.template:
+    src: restic-backup.sh.j2
+    dest: "{{ restic_install_dir }}/restic-backup.sh"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install restic-backup systemd unit
+  ansible.builtin.template:
+    src: restic-backup.service.j2
+    dest: /etc/systemd/system/restic-backup.service
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install restic-backup systemd timer
+  ansible.builtin.template:
+    src: restic-backup.timer.j2
+    dest: /etc/systemd/system/restic-backup.timer
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Enable and start restic-backup timer
+  ansible.builtin.systemd:
+    name: restic-backup.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Initialise restic repo (idempotent — no-op if already initialised)
+  ansible.builtin.command:
+    cmd: "restic cat config"
+  environment:
+    AWS_ACCESS_KEY_ID: "{{ restic_wasabi_access_key_id }}"
+    AWS_SECRET_ACCESS_KEY: "{{ restic_wasabi_secret_access_key }}"
+    RESTIC_PASSWORD: "{{ restic_password }}"
+    RESTIC_REPOSITORY: "{{ restic_repo }}"
+  register: restic_repo_check
+  failed_when: false
+  changed_when: false
+
+- name: Initialise restic repository
+  when: restic_repo_check.rc != 0
+  ansible.builtin.command:
+    cmd: "restic init"
+  environment:
+    AWS_ACCESS_KEY_ID: "{{ restic_wasabi_access_key_id }}"
+    AWS_SECRET_ACCESS_KEY: "{{ restic_wasabi_secret_access_key }}"
+    RESTIC_PASSWORD: "{{ restic_password }}"
+    RESTIC_REPOSITORY: "{{ restic_repo }}"
+  changed_when: true

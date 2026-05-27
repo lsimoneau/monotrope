@@ -8,6 +8,7 @@
     - proxmox_host
     - proxmox_lxc_config
     - caddy
+    - restic_backup
 
 - name: Provision LXCs (common)
   hosts: lxcs

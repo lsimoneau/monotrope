@@ -1,0 +1,127 @@
+---
+# restic_backup: centralised backup from the Proxmox host to Wasabi S3.
+# Runs on the Proxmox host and accesses LXC filesystems via pct mount.
+
+restic_version: "0.17.3"
+restic_install_dir: /usr/local/bin
+
+# Wasabi S3 configuration
+restic_wasabi_region: ap-southeast-2
+restic_wasabi_endpoint: "s3.{{ restic_wasabi_region }}.wasabisys.com"
+restic_wasabi_bucket: monotrope-backup
+restic_repo: "s3:https://{{ restic_wasabi_endpoint }}/{{ restic_wasabi_bucket }}/restic"
+
+# Schedule and retention
+restic_oncalendar: "*-*-* 03:00:00"
+restic_keep_daily: 30
+restic_keep_weekly: 12
+restic_keep_monthly: 12
+
+# Base path for pct mount targets (deterministic on Proxmox)
+restic_lxc_mount_base: /var/lib/lxc
+
+# Temporary directory for database dumps on the host
+restic_dump_dir: /var/tmp/restic-dumps
+
+# LXC vmids — sourced from inventory hostvars but enumerated here
+# so the backup script doesn't need to discover them dynamically.
+restic_backup_lxcs:
+  - vmid: 103
+    hostname: apps
+  - vmid: 104
+    hostname: hermes
+  - vmid: 102
+    hostname: media-stack
+  - vmid: 101
+    hostname: jellyfin
+  - vmid: 105
+    hostname: pihole
+
+# Backup sets: each defines paths (relative to the LXC mount point) and
+# optional pre/post commands. Paths are prefixed with the LXC mount at
+# render time. Ordered by priority — critical data first so early
+# failures surface quickly.
+restic_backup_sets:
+  - name: miniflux-db
+    vmid: 103
+    pre_commands:
+      - "pct exec 103 -- docker exec miniflux-db-1 pg_dump -U miniflux miniflux -F c > {{ restic_dump_dir }}/miniflux_dump.pgdump"
+    paths:
+      - var/lib/docker/volumes/miniflux_miniflux_db/_data
+    host_paths:
+      - "{{ restic_dump_dir }}/miniflux_dump.pgdump"
+    tags: [miniflux, critical, apps]
+
+  - name: hermes-state
+    vmid: 104
+    paths:
+      - root/.hermes
+    tags: [hermes, critical]
+
+  - name: audible-ingest
+    vmid: 103
+    paths:
+      - var/lib/docker/volumes/audible-ingest_audible_config/_data
+      - var/lib/docker/volumes/audible-ingest_audible_state/_data
+    tags: [audible-ingest, critical, apps]
+
+  - name: kobo-ingest
+    vmid: 103
+    paths:
+      - var/lib/docker/volumes/calibre_kobodl_config/_data
+      - var/lib/docker/volumes/calibre_kobo_ingest_state/_data
+    tags: [kobo-ingest, critical, apps]
+
+  - name: audiobookshelf
+    vmid: 103
+    paths:
+      - var/lib/docker/volumes/audiobookshelf_config/_data
+      - var/lib/docker/volumes/audiobookshelf_metadata/_data
+    tags: [audiobookshelf, apps]
+
+  - name: karakeep
+    vmid: 103
+    paths:
+      - var/lib/docker/volumes/karakeep_karakeep_data/_data
+      - var/lib/docker/volumes/karakeep_karakeep_meilisearch/_data
+    tags: [karakeep, apps]
+
+  - name: calibre-web
+    vmid: 103
+    paths:
+      - var/lib/docker/volumes/calibre_calibre_config/_data
+      - var/lib/docker/volumes/calibre_cwa_ingest/_data
+    tags: [calibre, apps]
+
+  - name: media-stack-configs
+    vmid: 102
+    paths:
+      - opt/media-stack/gluetun
+      - opt/media-stack/qbittorrent
+      - opt/media-stack/sonarr
+      - opt/media-stack/radarr
+      - opt/media-stack/lidarr
+      - opt/media-stack/prowlarr
+    tags: [media-stack]
+
+  - name: jellyfin-config
+    vmid: 101
+    paths:
+      - var/lib/jellyfin
+      - etc/jellyfin
+    tags: [jellyfin]
+    exclude:
+      - var/lib/jellyfin/transcodes
+      - var/cache/jellyfin
+
+  - name: koinsight
+    vmid: 103
+    paths:
+      - var/lib/docker/volumes/koinsight_data/_data
+    tags: [koinsight, apps]
+
+  - name: pihole
+    vmid: 105
+    paths:
+      - opt/pihole/etc-pihole
+    tags: [pihole]

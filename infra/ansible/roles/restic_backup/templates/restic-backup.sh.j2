@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# restic-backup.sh — centralised backup from the Proxmox host to Wasabi S3.
+# Managed by Ansible; do not edit manually.
+
+# shellcheck source=/dev/null
+set -a
+source "{{ restic_install_dir }}/restic-backup.env"
+set +a
+
+DRY_RUN=""
+if [ "${1:-}" = "--dry-run" ]; then
+    DRY_RUN="--dry-run"
+fi
+
+MOUNT_BASE="{{ restic_lxc_mount_base }}"
+DUMP_DIR="{{ restic_dump_dir }}"
+
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
+
+die() { log "FATAL: $*"; exit 1; }
+
+mounted_lxcs=()
+
+mount_lxc() {
+    local vmid="$1"
+    local mount_point="${MOUNT_BASE}/${vmid}/rootfs"
+
+    if mountpoint -q "$mount_point" 2>/dev/null; then
+        log "LXC ${vmid}: already mounted at ${mount_point}"
+    else
+        log "LXC ${vmid}: mounting via pct mount"
+        pct mount "$vmid" || die "Failed to mount LXC ${vmid}"
+        mounted_lxcs+=("$vmid")
+    fi
+}
+
+unmount_lxcs() {
+    for vmid in "${mounted_lxcs[@]:-}"; do
+        log "LXC ${vmid}: unmounting"
+        pct unmount "$vmid" || true
+    done
+}
+
+cleanup() {
+    log "Running cleanup"
+    unmount_lxcs
+    rm -rf "${DUMP_DIR:?}"/*
+}
+trap cleanup EXIT
+
+mkdir -p "$DUMP_DIR"
+
+# ── Phase 1: Mount all LXCs ───────────────────────────────────────────────
+{% for lxc in restic_backup_lxcs %}
+mount_lxc {{ lxc.vmid }}
+{% endfor %}
+
+# ── Phase 2: Pre-backup commands (database dumps, etc.) ───────────────────
+{% for set in restic_backup_sets %}
+{% if set.pre_commands is defined %}
+{% for cmd in set.pre_commands %}
+log "Pre-backup [{{ set.name }}]: {{ cmd }}"
+{{ cmd }} || die "Pre-backup command failed for {{ set.name }}"
+{% endfor %}
+{% endif %}
+{% endfor %}
+
+# ── Phase 3: Run restic backup per set ────────────────────────────────────
+{% for set in restic_backup_sets %}
+log "Backing up: {{ set.name }}"
+
+restic backup \
+    $DRY_RUN \
+{% for path in set.paths %}
+    "${MOUNT_BASE}/{{ set.vmid }}/rootfs/{{ path }}" \
+{% endfor %}
+{% if set.host_paths is defined %}
+{% for path in set.host_paths %}
+    "{{ path }}" \
+{% endfor %}
+{% endif %}
+{% if set.exclude is defined %}
+{% for excl in set.exclude %}
+    --exclude "{{ excl }}" \
+{% endfor %}
+{% endif %}
+    --tag "{{ set.name }}" \
+{% for tag in set.tags %}
+    --tag "{{ tag }}" \
+{% endfor %}
+    || die "Backup failed for {{ set.name }}"
+{% endfor %}
+
+# ── Phase 4: Forget and prune ─────────────────────────────────────────────
+log "Running forget + prune"
+restic forget \
+    $DRY_RUN \
+    --keep-daily {{ restic_keep_daily }} \
+    --keep-weekly {{ restic_keep_weekly }} \
+    --keep-monthly {{ restic_keep_monthly }} \
+    --prune || die "Forget/prune failed"
+
+log "Backup complete"

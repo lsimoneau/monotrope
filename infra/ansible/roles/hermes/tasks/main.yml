@@ -89,6 +89,27 @@
     state: link
     force: true
 
+- name: Write secrets to hermes .env
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export HERMES_HOME={{ hermes_home }}
+    hermes config set OPENROUTER_API_KEY "{{ openrouter_api_key }}"
+    hermes config set TELEGRAM_BOT_TOKEN "{{ hermes_telegram_bot_token }}"
+    hermes config set TELEGRAM_ALLOWED_USERS "{{ hermes_telegram_allowed_users }}"
+    hermes config set EMAIL_ADDRESS "monotrope.agent@gmail.com"
+    hermes config set EMAIL_PASSWORD "{{ hermes_email_password }}"
+    hermes config set EMAIL_IMAP_HOST "imap.gmail.com"
+    hermes config set EMAIL_SMTP_HOST "smtp.gmail.com"
+    hermes config set EMAIL_ALLOWED_USERS "{{ hermes_email_allowed_users }}"
+    hermes config set BROWSERBASE_API_KEY "{{ hermes_browserbase_api_key }}"
+    hermes config set BROWSERBASE_PROJECT_ID "{{ hermes_browserbase_project_id }}"
+    hermes config set GITHUB_TOKEN "{{ hermes_github_token }}"
+    hermes config set GH_TOKEN "{{ hermes_github_token }}"
+  args:
+    executable: /bin/bash
+  no_log: true
+  notify: Restart hermes-gateway
+
 - name: Configure hermes static settings via hermes config set
   ansible.builtin.shell: |
     set -euo pipefail

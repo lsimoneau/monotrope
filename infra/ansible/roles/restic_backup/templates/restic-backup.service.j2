@@ -1,0 +1,10 @@
+[Unit]
+Description=Restic backup to Wasabi S3
+After=network-online.target pve-cluster.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart={{ restic_install_dir }}/restic-backup.sh
+StandardOutput=journal
+StandardError=journal
