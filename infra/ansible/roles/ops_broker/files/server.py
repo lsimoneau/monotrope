@@ -20,7 +20,7 @@ import re
 
 from broker_core import RateLimiter, audit, build_server, configure_audit, run_argv, serve
 
-BROKER = "apps-ops"
+BROKER = os.environ.get("OPS_BROKER_NAME", "apps-ops")
 configure_audit(BROKER)
 
 _CONFIG = json.load(open(os.environ["OPS_BROKER_CONFIG"], encoding="utf-8"))

@@ -1,8 +1,7 @@
 ---
 # ops-broker: the lifecycle/observability capability surface for a host.
-# First instance of the shared broker_core scaffold. Runs as an unprivileged
-# system user whose only powers come from group membership (docker +
-# systemd-journal) — no root, no sudo.
+# Runs as an unprivileged system user whose only powers come from group
+# membership — no root, no sudo.
 
 ops_broker_user: opsbroker
 ops_broker_dir: /opt/ops-broker
@@ -11,11 +10,27 @@ ops_broker_dir: /opt/ops-broker
 ops_broker_bind: "{{ ansible_host }}"
 ops_broker_port: 9988
 
+# Broker identity for audit trail. Override per-host (e.g. "pve-ops").
+ops_broker_name: "apps-ops"
+
+# Systemd unit ordering. Override for hosts without Docker.
+ops_broker_after: "network-online.target docker.service"
+
+# Groups granted to the broker user. Override for hosts without Docker.
+ops_broker_groups:
+  - docker
+  - systemd-journal
+
 # Limits surfaced into the rendered config and enforced by the server.
 ops_broker_max_lines: 1000
 ops_broker_max_file_bytes: 262144   # 256 KiB cap on read_file output (tail)
 ops_broker_restart_cooldown: 60     # min seconds between restarts of one service
 ops_broker_restart_per_hour: 6      # cap per service per rolling hour
+
+# Shared uv-managed Python install, accessible to the service user.
+# uv installs to this directory instead of /root/.local.
+ops_broker_python_version: "3.14"
+ops_broker_python_dir: /opt/uv-python
 
 # Shared scaffold source, relative to the playbook dir (infra/ansible →
 # ../broker_core = infra/broker_core). Copied to the host and installed into the venv.

@@ -21,16 +21,14 @@
     creates: /usr/local/bin/uv
     executable: /bin/bash
 
-- name: Create ops-broker system user (docker + journal access via groups, no root)
+- name: Create ops-broker system user
   ansible.builtin.user:
     name: "{{ ops_broker_user }}"
     system: true
     shell: /usr/sbin/nologin
     home: "{{ ops_broker_dir }}"
     create_home: false
-    groups:
-      - docker
-      - systemd-journal
+    groups: "{{ ops_broker_groups }}"
     append: true
 
 - name: Ensure ops-broker directory exists
@@ -40,6 +38,24 @@
     owner: "{{ ops_broker_user }}"
     group: "{{ ops_broker_user }}"
     mode: '0750'
+
+- name: Ensure shared Python install directory
+  ansible.builtin.file:
+    path: "{{ ops_broker_python_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install Python via uv to shared location
+  ansible.builtin.shell:
+    cmd: "uv python install {{ ops_broker_python_version }}"
+  environment:
+    UV_PYTHON_INSTALL_DIR: "{{ ops_broker_python_dir }}"
+  args:
+    executable: /bin/bash
+  register: _python_install
+  changed_when: "'installed' in _python_install.stderr | lower"
 
 - name: Sync broker_core source to host
   ansible.builtin.copy:
@@ -52,18 +68,21 @@
   register: broker_core_sync
 
 - name: Create venv via uv
-  ansible.builtin.command: uv venv --python 3.11 .venv
+  ansible.builtin.command: uv venv --python {{ ops_broker_python_version }} .venv
   args:
     chdir: "{{ ops_broker_dir }}"
     creates: "{{ ops_broker_dir }}/.venv/bin/python"
+  environment:
+    UV_PYTHON_INSTALL_DIR: "{{ ops_broker_python_dir }}"
 
-- name: Install broker_core into venv
+- name: Ensure broker_core is installed in venv
   ansible.builtin.command: uv pip install --reinstall ./broker_core_src
   args:
     chdir: "{{ ops_broker_dir }}"
   environment:
     VIRTUAL_ENV: "{{ ops_broker_dir }}/.venv"
-  when: broker_core_sync.changed
+  register: _broker_core_install
+  changed_when: "'Installed' in _broker_core_install.stdout or 'Reinstalled' in _broker_core_install.stdout"
   notify: Restart ops-broker
 
 - name: Install server.py

@@ -130,6 +130,11 @@
     hermes config set mcp_servers.apps_ops.tools.prompts false
     hermes config set mcp_servers.apps_ops.tools.resources false
 
+    hermes config set mcp_servers.pve_ops.url "http://{{ hostvars['pve'].ansible_host }}:9988/mcp"
+    hermes config set mcp_servers.pve_ops.headers.Authorization "Bearer {{ ops_broker_token }}"
+    hermes config set mcp_servers.pve_ops.tools.prompts false
+    hermes config set mcp_servers.pve_ops.tools.resources false
+
   args:
     executable: /bin/bash  # set -o pipefail is a bashism; default /bin/sh is dash
   no_log: true

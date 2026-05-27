@@ -1,6 +1,6 @@
 [Unit]
 Description=ops-broker (Hermes capability broker — logs/status/restart)
-After=network-online.target docker.service
+After={{ ops_broker_after }}
 Wants=network-online.target
 
 [Service]

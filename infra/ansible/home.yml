@@ -9,6 +9,7 @@
     - proxmox_lxc_config
     - caddy
     - restic_backup
+    - { role: ops_broker, tags: [ops_broker] }
 
 - name: Provision LXCs (common)
   hosts: lxcs
