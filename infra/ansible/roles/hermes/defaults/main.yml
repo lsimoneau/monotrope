@@ -19,3 +19,8 @@ hermes_home: /root/.hermes
 # Public URL for the Miniflux instance still hosted on the VPS — the plugin
 # can no longer reach it on the docker-internal network from the LXC.
 hermes_miniflux_url: https://reader.monotrope.au
+
+# Web dashboard (hermes dashboard). Listens on all interfaces so Caddy on the
+# Proxmox host can reverse-proxy. The --insecure flag is set in the unit.
+hermes_dashboard_host: "0.0.0.0"
+hermes_dashboard_port: 9119

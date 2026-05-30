@@ -1,0 +1,21 @@
+[Unit]
+Description=Hermes Agent web dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=HERMES_HOME={{ hermes_home }}
+ExecStart=/usr/local/bin/hermes dashboard --host {{ hermes_dashboard_host }} --port {{ hermes_dashboard_port }} --insecure --skip-build
+WorkingDirectory={{ hermes_install_dir }}
+Restart=on-failure
+RestartSec=5
+
+# The dashboard serves a management UI with access to API keys and config.
+# Restrict to the LAN IP only — Caddy on the Proxmox host reverse-proxies
+# over TLS. The --insecure flag is needed to bind to non-localhost.
+ProtectSystem=strict
+ReadWritePaths={{ hermes_home }}
+
+[Install]
+WantedBy=multi-user.target
