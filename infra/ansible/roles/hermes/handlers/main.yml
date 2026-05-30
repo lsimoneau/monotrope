@@ -7,3 +7,8 @@
   ansible.builtin.systemd:
     name: hermes-gateway
     state: restarted
+
+- name: Restart hermes-dashboard
+  ansible.builtin.systemd:
+    name: hermes-dashboard
+    state: restarted
