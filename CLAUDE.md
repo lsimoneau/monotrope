@@ -37,6 +37,7 @@ CSS. The design should feel minimal, typographic, and monospaced-first.
   Also runs **ops-broker** (LAN-only MCP capability broker for Hermes — see below).
 - **`hermes` LXC** (192.168.0.96): Hermes Agent (native install, not Docker)
   — Telegram + email gateways, MCP servers, browser automation sandbox.
+  Web dashboard at `hermes.monotrope.au` (Caddy → `hermes dashboard` on port 9119).
 - **`jellyfin` LXC**, **`media-stack` LXC**: media playback + acquisition.
 - **HAOS VM**: Home Assistant.
 

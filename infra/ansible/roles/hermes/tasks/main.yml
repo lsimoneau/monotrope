@@ -233,6 +233,50 @@
     enabled: true
     daemon_reload: true
 
+# ── Web dashboard ──────────────────────────────────────────────────────────
+# The built-in `hermes dashboard` serves a React management UI (status, config,
+# sessions, cron, skills, logs) on port 9119. It needs a pre-built frontend
+# (Node.js build step) — we install Node.js for the build only, then the
+# systemd unit runs the dashboard with --skip-build against the baked dist.
+
+- name: Install Node.js (for web UI build)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+    apt-get install -y nodejs
+  args:
+    creates: /usr/bin/node
+    executable: /bin/bash
+
+- name: Build web UI frontend
+  ansible.builtin.shell: |
+    set -euo pipefail
+    cd {{ hermes_install_dir }}/web
+    npm install --ignore-scripts
+    npm run build
+  args:
+    executable: /bin/bash
+    chdir: "{{ hermes_install_dir }}/web"
+  when: hermes_repo.changed
+  notify: Restart hermes-dashboard
+
+- name: Install hermes-dashboard systemd unit
+  ansible.builtin.template:
+    src: hermes-dashboard.service.j2
+    dest: /etc/systemd/system/hermes-dashboard.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Reload systemd
+    - Restart hermes-dashboard
+
+- name: Enable hermes-dashboard
+  ansible.builtin.systemd:
+    name: hermes-dashboard
+    enabled: true
+    daemon_reload: true
+
 # ── Nightly state snapshot ─────────────────────────────────────────────────
 # `hermes backup --quick` snapshots config + state.db + auth + cron into
 # {{ hermes_home }}/state-snapshots/<timestamp>-<label>/. State.db carries
