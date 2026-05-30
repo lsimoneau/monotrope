@@ -257,7 +257,7 @@
   args:
     executable: /bin/bash
     chdir: "{{ hermes_install_dir }}/web"
-  when: hermes_repo.changed
+    creates: "{{ hermes_install_dir }}/hermes_cli/web_dist/index.html"
   notify: Restart hermes-dashboard
 
 - name: Install hermes-dashboard systemd unit
