@@ -4,9 +4,10 @@ build:
   list: always
   render: never
 cover: /covers/more-everything-forever.jpg
-date: 2026-04-13
+date: 2026-06-01
 isbn: '9781541619593'
 publish: false
-status: reading
+rating: 3.5
+status: finished
 title: More Everything Forever
 ---
