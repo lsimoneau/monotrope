@@ -79,3 +79,16 @@ command" tool.
 - Hugo deploys via Cloudflare Pages on push to `main`; `make build` /
   `make serve` are local-preview only
 - Home services deploy via `make home` (optionally `LIMIT=...`, `TAGS=...`)
+
+## Secrets & the Ansible Vault
+
+**Load the `ansible-vault` skill before any vault operation.** It
+defines the safe-inspection pattern (always redacted) and the
+helper scripts in `.agents/skills/ansible-vault/scripts/`. The
+short version: never let raw `ansible-vault view` output reach a
+`bash` tool's stdout — anything printed there is in the session log
+permanently. Use `vault-list.sh` (always redacted) to inspect keys,
+and `vault-add.sh` to append a placeholder for the user to fill in
+with `ansible-vault edit`. If a task seems to require showing a
+plaintext secret, stop and ask the user to confirm in writing
+first.
