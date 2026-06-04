@@ -1,0 +1,121 @@
+---
+# Bring up the libro-ingest sidecar — a small Python+librofm container
+# that periodically downloads new Libro.fm purchases and lays them out
+# under /audiobooks/<Author>/<Title>/ for audiobookshelf to scan.
+#
+# Image is built locally on the apps LXC (no external registry). Container
+# runs long-lived (`tail -f /dev/null`) so a host-side systemd timer can
+# `docker exec` the ingestion script without per-run startup overhead.
+#
+# Auth is a static username/password (librofm uses Libro.fm's OAuth
+# password flow under the hood). Credentials live in
+# /opt/libro-ingest/.env (rendered from the vault via templates/env.j2
+# and bind-mounted into the container), so secrets never appear on the
+# systemd unit's command line.
+#
+# Container runs as {{ libro_ingest_puid }}:{{ libro_ingest_pgid }}
+# (the NAS `homelab` user) so writes into /audiobooks land with the
+# right ownership over NFS.
+
+- name: Ensure libro-ingest directory
+  ansible.builtin.file:
+    path: "{{ libro_ingest_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Ensure build context directory
+  ansible.builtin.file:
+    path: "{{ libro_ingest_dir }}/build"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Sync Dockerfile to build context
+  ansible.builtin.copy:
+    src: Dockerfile
+    dest: "{{ libro_ingest_dir }}/build/Dockerfile"
+    owner: root
+    group: root
+    mode: '0644'
+  register: libro_ingest_dockerfile
+
+- name: Sync libro-ingest script to build context
+  ansible.builtin.copy:
+    src: libro-ingest
+    dest: "{{ libro_ingest_dir }}/build/libro-ingest"
+    owner: root
+    group: root
+    mode: '0755'
+  register: libro_ingest_script
+
+- name: Build libro-ingest image
+  ansible.builtin.command:
+    cmd: docker build -t {{ libro_ingest_image }} .
+    chdir: "{{ libro_ingest_dir }}/build"
+  when: libro_ingest_dockerfile.changed or libro_ingest_script.changed
+  register: libro_ingest_build
+  changed_when: true
+
+- name: Render compose.yml
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ libro_ingest_dir }}/compose.yml"
+    owner: root
+    group: root
+    mode: '0644'
+  register: libro_ingest_compose
+
+- name: Render .env (credentials)
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ libro_ingest_dir }}/.env"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+  register: libro_ingest_env
+
+- name: Bring up libro-ingest
+  ansible.builtin.command:
+    cmd: docker compose up -d --remove-orphans
+    chdir: "{{ libro_ingest_dir }}"
+  register: libro_ingest_up
+  changed_when: >-
+    'Started' in libro_ingest_up.stderr
+    or 'Created' in libro_ingest_up.stderr
+    or 'Recreate' in libro_ingest_up.stderr
+
+- name: Restart libro-ingest if compose, .env, or image changed
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate
+    chdir: "{{ libro_ingest_dir }}"
+  when: libro_ingest_compose.changed or libro_ingest_env.changed or libro_ingest_build.changed
+  changed_when: true
+
+- name: Install libro-ingest systemd service
+  ansible.builtin.template:
+    src: libro-ingest.service.j2
+    dest: /etc/systemd/system/libro-ingest.service
+    owner: root
+    group: root
+    mode: '0644'
+  register: libro_ingest_service_unit
+
+- name: Install libro-ingest systemd timer
+  ansible.builtin.template:
+    src: libro-ingest.timer.j2
+    dest: /etc/systemd/system/libro-ingest.timer
+    owner: root
+    group: root
+    mode: '0644'
+  register: libro_ingest_timer_unit
+
+- name: Enable libro-ingest timer
+  ansible.builtin.systemd:
+    name: libro-ingest.timer
+    enabled: true
+    state: started
+    daemon_reload: true

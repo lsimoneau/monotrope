@@ -1,0 +1,18 @@
+---
+libro_ingest_dir: /opt/libro-ingest
+libro_ingest_tz: Australia/Sydney
+libro_ingest_image: libro-ingest:latest
+libro_ingest_audiobooks_path: /library/audiobooks
+# Match the audiobookshelf NAS user so files written into /audiobooks
+# show up as homelab:homelab on the NAS, and so any future in-container
+# tools (if added) can read state.json without uid-mismatch surprises.
+libro_ingest_puid: 1028
+libro_ingest_pgid: 1028
+# Daily sweep — same cadence as audible_ingest.
+libro_ingest_oncalendar: "*-*-* 06:30:00"
+# Drip-feed caps. With ~25/day, a 200-book initial library catches up in
+# ~8 days; once steady-state, new purchases are 1-2/run and the cap is
+# irrelevant. Sleep is jittered uniformly between min and max.
+libro_ingest_max_per_run: 25
+libro_ingest_sleep_min: 30
+libro_ingest_sleep_max: 90

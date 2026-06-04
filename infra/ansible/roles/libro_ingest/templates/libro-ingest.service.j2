@@ -1,0 +1,12 @@
+[Unit]
+Description=Libro.fm→Audiobookshelf ingestion sweep
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker exec \
+  -e MAX_PER_RUN={{ libro_ingest_max_per_run }} \
+  -e SLEEP_MIN={{ libro_ingest_sleep_min }} \
+  -e SLEEP_MAX={{ libro_ingest_sleep_max }} \
+  libro-ingest-libro-ingest-1 /opt/libro-venv/bin/libro-ingest

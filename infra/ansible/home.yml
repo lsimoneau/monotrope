@@ -40,6 +40,8 @@
     - audiobookshelf
     - role: audible_ingest
       tags: [audible_ingest]
+    - role: libro_ingest
+      tags: [libro_ingest]
     - koinsight
     - miniflux
     - role: karakeep

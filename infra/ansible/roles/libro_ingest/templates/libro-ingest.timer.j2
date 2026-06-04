@@ -1,0 +1,9 @@
+[Unit]
+Description=Libro.fm→Audiobookshelf ingestion sweep
+
+[Timer]
+OnCalendar={{ libro_ingest_oncalendar }}
+Persistent=true
+
+[Install]
+WantedBy=timers.target

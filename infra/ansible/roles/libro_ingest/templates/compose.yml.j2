@@ -1,0 +1,18 @@
+services:
+  libro-ingest:
+    image: {{ libro_ingest_image }}
+    pull_policy: never
+    restart: unless-stopped
+    user: "{{ libro_ingest_puid }}:{{ libro_ingest_pgid }}"
+    volumes:
+      - libro_state:/var/lib/libro-ingest
+      - {{ libro_ingest_audiobooks_path }}:/audiobooks
+      - ./.env:/var/lib/libro-ingest/.env:ro
+    environment:
+      TZ: "{{ libro_ingest_tz }}"
+    # Long-running so the timer can `docker exec` daily without paying
+    # container-start overhead per sweep.
+    command: ["tail", "-f", "/dev/null"]
+
+volumes:
+  libro_state:

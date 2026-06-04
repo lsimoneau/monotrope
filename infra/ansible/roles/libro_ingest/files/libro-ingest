@@ -1,0 +1,153 @@
+#!/opt/libro-venv/bin/python
+"""Libro.fm→Audiobookshelf ingestion sweep.
+
+Lists the Libro.fm library via librofm, matches against per-book folders
+in /audiobooks, and downloads anything missing. State is keyed by ISBN
+so the loop is idempotent across runs.
+
+Layout: /audiobooks/<Author>/<Title>/<files> — librofm writes per-part
+MP3s or a single M4B into the folder; it does not auto-organise, so
+the script creates the dir.
+
+Runs inside the libro-ingest container; a host-side systemd timer fires
+`docker exec` daily.
+"""
+import json
+import os
+import random
+import re
+import shutil
+import sys
+import time
+import unicodedata
+from pathlib import Path
+
+from librofm.client import LibroFMClient
+
+LIBRARY = Path("/audiobooks")
+STATE_DIR = Path("/var/lib/libro-ingest")
+STATE = STATE_DIR / "state.json"
+ENV_FILE = STATE_DIR / ".env"
+
+TERMINAL = {"imported", "pinned"}
+ILLEGAL_FS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+AUDIO_EXT = (".mp3", ".m4b")
+
+SLEEP_MIN = int(os.environ.get("SLEEP_MIN", "30"))
+SLEEP_MAX = int(os.environ.get("SLEEP_MAX", "90"))
+MAX_PER_RUN = int(os.environ["MAX_PER_RUN"]) if os.environ.get("MAX_PER_RUN") else None
+
+
+def safe_name(s: str) -> str:
+    s = unicodedata.normalize("NFKC", s)
+    s = ILLEGAL_FS.sub("", s).strip().rstrip(".")
+    return re.sub(r"\s+", " ", s)
+
+
+def load_env_file(path: Path) -> None:
+    if not path.exists():
+        raise RuntimeError(f"missing env file: {path}")
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        k, v = k.strip(), v.strip()
+        if v and v[0] == v[-1] and v[0] in ("'", '"'):
+            v = v[1:-1]
+        os.environ.setdefault(k, v)
+
+
+def first_author(authors: list[str]) -> str:
+    if not authors:
+        return "Unknown Author"
+    a = (authors[0] or "").strip()
+    return a or "Unknown Author"
+
+
+def book_folder(author: str, title: str) -> Path:
+    return LIBRARY / safe_name(author) / safe_name(title)
+
+
+def looks_complete(folder: Path) -> bool:
+    return folder.is_dir() and any(
+        p.is_file() and p.suffix.lower() in AUDIO_EXT for p in folder.iterdir()
+    )
+
+
+def has_files(folder: Path) -> bool:
+    return folder.is_dir() and any(folder.iterdir())
+
+
+def persist_state(state: dict) -> None:
+    tmp = STATE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(state, indent=2, sort_keys=True))
+    tmp.replace(STATE)
+
+
+def main() -> int:
+    load_env_file(ENV_FILE)
+    username = os.environ["LIBROFM_USERNAME"]
+    password = os.environ["LIBROFM_PASSWORD"]
+    client = LibroFMClient(username, password)
+
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    state = json.loads(STATE.read_text()) if STATE.exists() else {}
+
+    counts = dict(downloaded=0, already=0, errors=0)
+
+    page_num = 1
+    total_pages = None
+    while total_pages is None or page_num <= total_pages:
+        page = client.get_library(page=page_num)
+        if total_pages is None:
+            total_pages = page.total_pages
+
+        for book in page.audiobooks:
+            isbn = str(book.isbn)
+            title = (book.title or "").strip()
+            if not title:
+                continue
+            author = first_author(book.authors or [])
+            folder = book_folder(author, title)
+
+            status = state.get(isbn, {}).get("status")
+            if status in TERMINAL and looks_complete(folder):
+                continue
+
+            if MAX_PER_RUN is not None and counts["downloaded"] >= MAX_PER_RUN:
+                print(f"hit MAX_PER_RUN={MAX_PER_RUN}, stopping sweep early",
+                      file=sys.stderr)
+                persist_state(state)
+                print(" ".join(f"{k}={v}" for k, v in counts.items()))
+                return 0
+
+            if has_files(folder):
+                shutil.rmtree(folder)
+            folder.mkdir(parents=True, exist_ok=True)
+
+            try:
+                client.download(book, str(folder))
+                if not looks_complete(folder):
+                    raise RuntimeError("download returned but no audio files in folder")
+                state[isbn] = {
+                    "status": "imported", "title": title, "author": author,
+                    "downloaded_at": int(time.time()),
+                }
+                counts["downloaded"] += 1
+                time.sleep(random.uniform(SLEEP_MIN, SLEEP_MAX))
+            except Exception as e:
+                counts["errors"] += 1
+                print(f"ERROR: {isbn} {title!r}: {e}", file=sys.stderr)
+                if folder.is_dir() and not any(folder.iterdir()):
+                    folder.rmdir()
+
+        page_num += 1
+
+    persist_state(state)
+    print(" ".join(f"{k}={v}" for k, v in counts.items()))
+    return 1 if counts["errors"] else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

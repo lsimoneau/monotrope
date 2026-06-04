@@ -65,6 +65,12 @@ restic_backup_sets:
       - var/lib/docker/volumes/audible-ingest_audible_state/_data
     tags: [audible-ingest, critical, apps]
 
+  - name: libro-ingest
+    vmid: 103
+    paths:
+      - var/lib/docker/volumes/libro-ingest_libro_state/_data
+    tags: [libro-ingest, critical, apps]
+
   - name: kobo-ingest
     vmid: 103
     paths:
