@@ -9,7 +9,7 @@
 # the host — the two checkouts fight over HEAD and each restart the gateway,
 # which can leave the running process holding stale code (an in-process module
 # cache that no longer matches disk). To update Hermes, bump this tag + deploy.
-hermes_version: v2026.5.16
+hermes_version: v2026.5.29
 hermes_repo_url: https://github.com/NousResearch/hermes-agent.git
 
 # Filesystem layout. Matches upstream FHS-root install.sh defaults.
