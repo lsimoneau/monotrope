@@ -124,6 +124,12 @@
     - Reload systemd
     - Restart ops-broker
 
+- name: Install sudo (required for triggerable service grants)
+  ansible.builtin.apt:
+    name: sudo
+    state: present
+  when: ops_broker_services | dict2items | json_query('[?value.triggerable==`true`]') | length > 0
+
 - name: Install sudoers grant for triggerable services
   ansible.builtin.template:
     src: ops-broker.sudoers.j2
@@ -132,7 +138,7 @@
     group: root
     mode: '0440'
     validate: visudo -cf %s
-  when: ops_broker_services | dict2items | selectattr('value.triggerable', 'equalto', true) | list | length > 0
+  when: ops_broker_services | dict2items | json_query('[?value.triggerable==`true`]') | length > 0
 
 - name: Enable and start ops-broker
   ansible.builtin.systemd:
