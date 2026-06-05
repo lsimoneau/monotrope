@@ -71,9 +71,8 @@ restic-backup: {source: journal, target: restic-backup.service, restartable: fal
   be `inactive` between runs, but `Result` and `ExecMainStatus` tell you whether
   the last invocation succeeded.
 - **Logs**: `journalctl -u <unit> -n N --no-pager`
-- **Restart**: `systemctl restart` — **requires a polkit/sudoers grant** which
-  is not currently configured. All journal-source services are set to
-  `restartable: false`.
+- **Restart**: `systemctl restart` — not currently exposed. Trigger a re-run
+  with `start_service` (oneshot units only) instead.
 
 ### Sidecar pattern
 
@@ -93,6 +92,7 @@ broker reports the actual sweep result, not the idle container.
 | `list_files` | List allowlisted diagnostic files (for state outside journald/docker) |
 | `read_file` | Read the tail of an allowlisted file (host path or inside a container volume) |
 | `restart_service` | Restart a service (only if `restartable: true`, rate-limited) |
+| `start_service` | Start a oneshot unit (only if `triggerable: true`, rate-limited) — used to fire timer-driven sweeps on demand |
 
 ## Per-host configuration
 
@@ -146,7 +146,10 @@ The same `server.py` and `broker_core` are reused — only the config changes.
 ## Privilege model
 
 The broker runs as the `opsbroker` system user (`/usr/sbin/nologin`, no home dir).
-It gets exactly the access it needs through group membership and nothing more:
+Its systemd unit sets `NoNewPrivileges=true`, so it cannot gain new privileges
+(setuid, file caps) at runtime — any escalation must happen out-of-process.
+The broker gets exactly the access it needs through group membership and
+polkit, and nothing more:
 
 | Capability | How it's granted |
 |---|---|
@@ -154,7 +157,15 @@ It gets exactly the access it needs through group membership and nothing more:
 | Restart Docker containers | `docker` group membership (scoped by allowlist) |
 | Read systemd unit status | `systemctl show` works for any user |
 | Read journald logs | `systemd-journal` group membership |
-| Restart systemd services | **Not granted** — requires polkit/sudoers |
+| Start systemd units (`start_service`) | polkit rule on `org.freedesktop.systemd1.manage-units`, scoped to `opsbroker` + the specific `triggerable: true` units |
+
+Why polkit and not sudo: the broker unit's `NoNewPrivileges=true` blocks
+setuid, which is what `sudo` relies on. Polkit authorises D-Bus calls to
+systemd directly — no privilege escalation in the broker process, no
+setuid binary, no new-privileges flag to relax. The polkit rule file is
+rendered by Ansible from the same `triggerable: true` flag the broker
+config already uses, so adding a new triggerable service is one inventory
+change.
 
 The allowlist is the critical boundary. Hermes can only name keys that exist in
 `ops_broker_services` — it never sees raw container names, unit paths, or file

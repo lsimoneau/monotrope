@@ -1,0 +1,42 @@
+// Managed by Ansible (ops_broker role). Do not edit.
+//
+// Authorises the unprivileged opsbroker user to call systemd's
+// org.freedesktop.systemd1.Manager.StartUnit D-Bus method for the specific
+// oneshot units marked triggerable in ops_broker_services. The broker talks to
+// systemd over the system bus (via busctl), and the broker's systemd unit runs
+// with NoNewPrivileges=true — so a setuid sudo path is not an option here. This
+// polkit rule is the entire privilege boundary for triggering sweeps.
+//
+// Scope:
+//   - action.id  : "org.freedesktop.systemd1.manage-units"  (StartUnit path)
+//   - subject    : local Unix user {{ ops_broker_user }} only
+//   - unit       : must appear in ops_broker_services with triggerable=true
+//
+// Anything else (Stop/Reload/Disable, other users, other units) is left to
+// polkit's defaults — i.e. denied for an unprivileged user.
+polkit.addRule(function(action, subject) {
+    if (action.id !== "org.freedesktop.systemd1.manage-units") {
+        return polkit.Result.NOT_HANDLED;
+    }
+    if (subject.local === false || subject.active === false) {
+        return polkit.Result.NOT_HANDLED;
+    }
+    if (subject.user !== "{{ ops_broker_user }}") {
+        return polkit.Result.NOT_HANDLED;
+    }
+    var unit = action.lookup("unit");
+    if (!unit || typeof unit !== "string") {
+        return polkit.Result.NOT_HANDLED;
+    }
+    var allowed = {
+{%- for name, entry in ops_broker_services.items() %}
+{%- if entry.get('triggerable') %}
+        "{{ entry.target }}": true,
+{%- endif %}
+{%- endfor %}
+    };
+    if (allowed[unit]) {
+        return polkit.Result.YES;
+    }
+    return polkit.Result.NOT_HANDLED;
+});

@@ -132,21 +132,27 @@
     - Reload systemd
     - Restart ops-broker
 
-- name: Install sudo (required for triggerable service grants)
-  ansible.builtin.apt:
-    name: sudo
-    state: present
-  when: ops_broker_services | dict2items | json_query('[?value.triggerable==`true`]') | length > 0
-
-- name: Install sudoers grant for triggerable services
+# Triggering a systemd oneshot from the broker requires the opsbroker user to be
+# allowed to call StartUnit on the specific unit. The broker's systemd unit runs
+# with NoNewPrivileges=true, so a setuid sudo path is unavailable: we authorise
+# the call via polkit, which gates D-Bus calls to systemd1 on a per-unit basis
+# without any privilege escalation in the process. The polkit rule is rendered
+# from the same triggerable=true flag the broker config already uses — adding a
+# new triggerable service is one inventory change.
+- name: Install polkit rule authorising opsbroker to StartUnit triggerable services
   ansible.builtin.template:
-    src: ops-broker.sudoers.j2
-    dest: /etc/sudoers.d/ops-broker
+    src: 50-ops-broker-manage-units.rules.j2
+    dest: /etc/polkit-1/rules.d/50-ops-broker-manage-units.rules
     owner: root
     group: root
-    mode: '0440'
-    validate: visudo -cf %s
+    mode: '0644'
   when: ops_broker_services | dict2items | json_query('[?value.triggerable==`true`]') | length > 0
+  notify: Restart polkit
+
+- name: Remove obsolete sudoers grant (superseded by polkit rule)
+  ansible.builtin.file:
+    path: /etc/sudoers.d/ops-broker
+    state: absent
 
 - name: Enable and start ops-broker
   ansible.builtin.systemd:
