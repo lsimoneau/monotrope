@@ -13,6 +13,7 @@ Runs inside the libro-ingest container; a host-side systemd timer fires
 `docker exec` daily.
 """
 import json
+import logging
 import os
 import random
 import re
@@ -22,6 +23,8 @@ import time
 import unicodedata
 from pathlib import Path
 
+import requests
+from librofm import client as _librofm_client
 from librofm.client import LibroFMClient
 
 LIBRARY = Path("/audiobooks")
@@ -33,9 +36,53 @@ TERMINAL = {"imported", "pinned"}
 ILLEGAL_FS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 AUDIO_EXT = (".mp3", ".m4b")
 
+# Default to WARNING so a failed Libro.fm login (non-JSON 401/403/429, or an
+# empty body) ends up in `journalctl -u libro-ingest` as a real diagnostic
+# line — status code + first 500 chars of the body — instead of a useless
+# "Expecting value: line 1 column 1 (char 0)" from json.loads. Set LOG_LEVEL
+# in the systemd unit to override (e.g. LOG_LEVEL=INFO for full request logs).
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "WARNING").upper()
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format="%(asctime)s %(levelname)s libro-ingest: %(message)s",
+    stream=sys.stderr,
+)
+log = logging.getLogger("libro-ingest")
+
 SLEEP_MIN = int(os.environ.get("SLEEP_MIN", "30"))
 SLEEP_MAX = int(os.environ.get("SLEEP_MAX", "90"))
 MAX_PER_RUN = int(os.environ["MAX_PER_RUN"]) if os.environ.get("MAX_PER_RUN") else None
+
+
+def _do_post_logged(self, endpoint, data):
+    """Drop-in replacement for LibroFMClient._do_post that logs the raw
+    response before parsing. Vendored librofm raises a bare
+    `requests.exceptions.JSONDecodeError` on a non-JSON body, which strips
+    away the only useful diagnostic (status code + body). We log it at
+    WARNING so the failure mode is visible in `journalctl -u libro-ingest`,
+    then call `raise_for_status()` so 4xx responses (the likely cause —
+    bad credentials, rate limit, captcha wall) surface as a real
+    `HTTPError` rather than a misleading `JSONDecodeError`. Two small
+    behaviour changes vs. vendored:
+
+      * Non-2xx responses raise `HTTPError` instead of `JSONDecodeError`.
+      * The exact response body is logged at WARNING.
+
+    Installed via monkey-patch in `main()` so a future `pip install
+    --upgrade librofm` can't silently undo this fix.
+    """
+    resp = requests.post(
+        f"{_librofm_client.BASE_URL}{endpoint}",
+        headers=self.headers,
+        json=data,
+    )
+    body_preview = (resp.text or "")[:500]
+    log.warning(
+        "librofm %s -> %s (body[:500]=%r)",
+        endpoint, resp.status_code, body_preview,
+    )
+    resp.raise_for_status()
+    return resp.json()
 
 
 def safe_name(s: str) -> str:
@@ -89,6 +136,10 @@ def main() -> int:
     load_env_file(ENV_FILE)
     username = os.environ["LIBROFM_USERNAME"]
     password = os.environ["LIBROFM_PASSWORD"]
+    # Patch vendored librofm before any call so its `_do_post` logs the raw
+    # response. Survives `pip install --upgrade librofm` because the override
+    # lives in our wrapper, not in site-packages.
+    _librofm_client.LibroFMClient._do_post = _do_post_logged
     client = LibroFMClient(username, password)
 
     STATE_DIR.mkdir(parents=True, exist_ok=True)
@@ -99,7 +150,18 @@ def main() -> int:
     page_num = 1
     total_pages = None
     while total_pages is None or page_num <= total_pages:
-        page = client.get_library(page=page_num)
+        try:
+            page = client.get_library(page=page_num)
+        except Exception as e:
+            # librofm's authenticate() retry already logs at WARNING via the
+            # _do_post patch; this catch is the last-chance handler so the
+            # sweep exits cleanly with a counted error instead of an
+            # uncaught traceback on a half-paginated library.
+            log.error("get_library(page=%d) failed: %s", page_num, e)
+            counts["errors"] += 1
+            persist_state(state)
+            print(" ".join(f"{k}={v}" for k, v in counts.items()))
+            return 1
         if total_pages is None:
             total_pages = page.total_pages
 
