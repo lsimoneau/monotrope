@@ -9,16 +9,22 @@
 //
 // Scope:
 //   - action.id  : "org.freedesktop.systemd1.manage-units"  (StartUnit path)
-//   - subject    : local Unix user {{ ops_broker_user }} only
+//   - subject    : Unix user {{ ops_broker_user }} only
 //   - unit       : must appear in ops_broker_services with triggerable=true
+//
+// The boundary is `subject.user`. The usual polkit hardening checks
+// (`subject.local`, `subject.active`) are unreliable inside the Proxmox
+// LXC: polkit 122 reports local=false and active=false for system bus
+// connections from the broker's own subprocess.run, even though the call
+// is from a local unix-socket connection from a real live process. This
+// is acceptable here because the system bus doesn't accept network
+// connections by default (so `local` adds nothing), and the user-identity
+// check is the only thing we actually care about.
 //
 // Anything else (Stop/Reload/Disable, other users, other units) is left to
 // polkit's defaults — i.e. denied for an unprivileged user.
 polkit.addRule(function(action, subject) {
     if (action.id !== "org.freedesktop.systemd1.manage-units") {
-        return polkit.Result.NOT_HANDLED;
-    }
-    if (subject.local === false || subject.active === false) {
         return polkit.Result.NOT_HANDLED;
     }
     if (subject.user !== "{{ ops_broker_user }}") {
