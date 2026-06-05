@@ -80,9 +80,21 @@ def has_files(folder: Path) -> bool:
 
 
 def persist_state(state: dict) -> None:
-    tmp = STATE.with_suffix(".tmp")
-    tmp.write_text(json.dumps(state, indent=2, sort_keys=True))
-    tmp.replace(STATE)
+    """Atomically replace STATE with a JSON dump of `state`.
+
+    Defensive on write failure: if the state dir is unwritable (e.g. a
+    fresh volume with ownership from a different uid, or a host-side
+    bind-mount with restrictive perms), log a warning and return. A
+    stale-but-readable state.json is strictly better than crashing the
+    sweep's failure path with a PermissionError — the failure path is
+    exactly where we most need the real-cause diagnostic to surface.
+    """
+    try:
+        tmp = STATE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(state, indent=2, sort_keys=True))
+        tmp.replace(STATE)
+    except OSError as e:
+        log.warning("could not persist state to %s: %s", STATE, e)
 
 
 def main() -> int:
