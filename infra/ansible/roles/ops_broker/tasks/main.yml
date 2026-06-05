@@ -124,6 +124,16 @@
     - Reload systemd
     - Restart ops-broker
 
+- name: Install sudoers grant for triggerable services
+  ansible.builtin.template:
+    src: ops-broker.sudoers.j2
+    dest: /etc/sudoers.d/ops-broker
+    owner: root
+    group: root
+    mode: '0440'
+    validate: visudo -cf %s
+  when: ops_broker_services | dict2items | selectattr('value.triggerable', 'equalto', true) | list | length > 0
+
 - name: Enable and start ops-broker
   ansible.builtin.systemd:
     name: ops-broker

@@ -151,7 +151,7 @@ def _read_tail(path: str, max_bytes: int) -> tuple[str, bool, int]:
     name="list_services",
     description=(
         "List the services this host's broker manages, with each one's type "
-        "(docker/journal), live status, and whether a restart is permitted."
+        "(docker/journal), live status, and whether a restart or trigger is permitted."
     ),
 )
 def list_services() -> str:
@@ -160,6 +160,7 @@ def list_services() -> str:
             "service": name,
             "source": entry["source"],
             "restartable": bool(entry.get("restartable")),
+            "triggerable": bool(entry.get("triggerable")),
             "status": _status_of(entry),
         }
         for name, entry in SERVICES.items()
@@ -184,6 +185,7 @@ def service_status(service: str) -> str:
             "service": service,
             "source": entry["source"],
             "restartable": bool(entry.get("restartable")),
+            "triggerable": bool(entry.get("triggerable")),
             "status": status,
         }
     )
@@ -298,6 +300,40 @@ def read_file(name: str) -> str:
 
     audit("read_file", {"file": name}, "allow", rc=rc)
     return json.dumps({"file": name, "returncode": rc, "truncated": truncated, "output": output})
+
+
+@mcp.tool(
+    name="start_service",
+    description=(
+        "Start (trigger) a oneshot service. Permitted only for services with "
+        "triggerable=true (see list_services). Designed for timer-driven ingest "
+        "sweeps — fires the unit via sudo systemctl start so the sweep runs on "
+        "demand instead of waiting for the next timer tick. "
+        "Rate-limited per service."
+    ),
+)
+def start_service(service: str) -> str:
+    entry = SERVICES.get(service)
+    if not entry:
+        audit("start_service", {"service": service}, "deny", reason="unknown service")
+        return _err(f"unknown service '{service}'")
+    if not entry.get("triggerable"):
+        audit("start_service", {"service": service}, "deny", reason="not triggerable")
+        return _err(f"service '{service}' is not triggerable")
+
+    allowed, reason = _restart_limiter.allow(service)
+    if not allowed:
+        audit("start_service", {"service": service}, "deny", reason=reason)
+        return _err(reason)
+
+    argv = ["sudo", "systemctl", "start", entry["target"]]
+
+    res = run_argv(argv, timeout=120)
+    decision = "allow" if res.returncode == 0 else "error"
+    audit("start_service", {"service": service}, decision, rc=res.returncode)
+    return json.dumps(
+        {"service": service, "returncode": res.returncode, "output": res.output}
+    )
 
 
 @mcp.tool(

@@ -1,0 +1,8 @@
+# Managed by Ansible (ops_broker role). Do not edit.
+# Grants the opsbroker unprivileged user permission to `systemctl start`
+# specific oneshot units marked triggerable in the broker config.
+{% for name, entry in ops_broker_services.items() %}
+{% if entry.get('triggerable') %}
+{{ ops_broker_user }} ALL=(root) NOPASSWD: /usr/bin/systemctl start {{ entry.target }}
+{% endif %}
+{% endfor %}
