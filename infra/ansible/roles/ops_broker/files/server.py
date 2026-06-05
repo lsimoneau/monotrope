@@ -320,7 +320,7 @@ def start_service(service: str) -> str:
     if not entry.get("triggerable"):
         audit("start_service", {"service": service}, "deny", reason="not triggerable")
         return _err(f"service '{service}' is not triggerable")
-    if entry["source"] != "journal":
+    if entry.get("source") != "journal":
         audit("start_service", {"service": service}, "deny", reason="not a systemd unit")
         return _err(f"service '{service}' is not a systemd unit")
 
@@ -350,6 +350,15 @@ def start_service(service: str) -> str:
     res = run_argv(argv, timeout=120)
     decision = "allow" if res.returncode == 0 else "error"
     audit("start_service", {"service": service}, decision, rc=res.returncode)
+    if res.returncode == 0:
+        # busctl writes the reply as `o "/org/freedesktop/systemd1/job/N"`.
+        # Surface a human-readable confirmation; the raw object path is
+        # included so an operator can `journalctl` against the job if needed.
+        m = re.search(r'"(/org/freedesktop/systemd1/job/\d+)"', res.output)
+        job = m.group(1) if m else res.output.strip() or "queued"
+        return json.dumps(
+            {"service": service, "returncode": 0, "triggered": f"queued {entry['target']} ({job})"}
+        )
     return json.dumps(
         {"service": service, "returncode": res.returncode, "output": res.output}
     )
