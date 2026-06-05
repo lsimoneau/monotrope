@@ -307,9 +307,9 @@ def read_file(name: str) -> str:
     description=(
         "Start (trigger) a oneshot service. Permitted only for services with "
         "triggerable=true (see list_services). Designed for timer-driven ingest "
-        "sweeps — fires the unit via sudo systemctl start so the sweep runs on "
-        "demand instead of waiting for the next timer tick. "
-        "Rate-limited per service."
+        "sweeps — fires the unit via systemd's StartUnit D-Bus method (polkit-"
+        "authorised) so the sweep runs on demand instead of waiting for the next "
+        "timer tick. Rate-limited per service."
     ),
 )
 def start_service(service: str) -> str:
@@ -320,13 +320,32 @@ def start_service(service: str) -> str:
     if not entry.get("triggerable"):
         audit("start_service", {"service": service}, "deny", reason="not triggerable")
         return _err(f"service '{service}' is not triggerable")
+    if entry["source"] != "journal":
+        audit("start_service", {"service": service}, "deny", reason="not a systemd unit")
+        return _err(f"service '{service}' is not a systemd unit")
 
     allowed, reason = _restart_limiter.allow(service)
     if not allowed:
         audit("start_service", {"service": service}, "deny", reason=reason)
         return _err(reason)
 
-    argv = ["sudo", "systemctl", "start", entry["target"]]
+    # Talk to systemd's manager over the system bus. Polkit authorises the call
+    # per-unit via /etc/polkit-1/rules.d/50-ops-broker-manage-units.rules (the
+    # opsbroker user, this exact unit, StartUnit only). We deliberately avoid
+    # `sudo systemctl start`: the broker's unit has NoNewPrivileges=true, which
+    # blocks setuid escalation, and sudo is not how this is authorised anyway.
+    # busctl gives an unambiguous audit trail and is part of systemd (always
+    # present on hosts that run systemd, which is every host we manage).
+    argv = [
+        "busctl", "call",
+        "org.freedesktop.systemd1",
+        "/org/freedesktop/systemd1",
+        "org.freedesktop.systemd1.Manager",
+        "StartUnit",
+        "ss",
+        entry["target"],
+        "replace",
+    ]
 
     res = run_argv(argv, timeout=120)
     decision = "allow" if res.returncode == 0 else "error"

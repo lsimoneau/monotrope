@@ -7,3 +7,12 @@
   ansible.builtin.systemd:
     name: ops-broker
     state: restarted
+
+# polkitd caches rule files at startup. A `Restart polkit` is required after a
+# rule change, otherwise the broker's first start_service call will be denied
+# by the stale policy (the file is in place but polkit is still serving the
+# pre-deploy snapshot). `systemctl restart polkit` is idempotent and quick.
+- name: Restart polkit
+  ansible.builtin.systemd:
+    name: polkit
+    state: restarted
