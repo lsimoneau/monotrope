@@ -113,6 +113,14 @@
   no_log: true
   notify: Restart ops-broker
 
+# Flush handlers now so the broker picks up the new config, env file, and
+# server.py BEFORE subsequent tasks run. Without this, the restart is deferred
+# to end-of-play and can be masked by the trailing `state: started` task — which
+# is a no-op on an already-running service, so a stale process keeps serving
+# requests from the previous config indefinitely.
+- name: Flush handlers (restart broker with new config)
+  ansible.builtin.meta: flush_handlers
+
 - name: Install ops-broker systemd unit
   ansible.builtin.template:
     src: ops-broker.service.j2

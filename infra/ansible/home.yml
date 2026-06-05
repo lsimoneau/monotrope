@@ -4,6 +4,11 @@
 - name: Provision Proxmox host
   hosts: proxmox_hosts
   become: true
+  # force_handlers: even if a later task in this play fails, restart-style
+  # handlers (caddy reload, ops-broker restart) still fire — the worst case
+  # is the next `make home` re-attempts the same work, not a stale process
+  # serving from old config.
+  force_handlers: true
   roles:
     - proxmox_host
     - proxmox_lxc_config
@@ -34,6 +39,7 @@
 - name: Provision apps LXC
   hosts: apps
   become: true
+  force_handlers: true
   roles:
     - docker
     - calibre_web
