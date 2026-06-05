@@ -8,6 +8,11 @@
     name:
       - python3
       - python3-venv
+      # polkitd gates the StartUnit D-Bus call from start_service; without it
+      # the rule file in /etc/polkit-1/rules.d/ is silently ignored and the
+      # "Restart polkit" handler has nothing to restart. Idempotent — noop on
+      # hosts that already have it.
+      - polkitd
     state: present
     update_cache: true
     cache_valid_time: 3600
@@ -121,6 +126,34 @@
 - name: Flush handlers (restart broker with new config)
   ansible.builtin.meta: flush_handlers
 
+# Triggering a systemd oneshot from the broker requires the opsbroker user to be
+# allowed to call StartUnit on the specific unit. The broker's systemd unit runs
+# with NoNewPrivileges=true, so a setuid sudo path is unavailable: we authorise
+# the call via polkit, which gates D-Bus calls to systemd1 on a per-unit basis
+# without any privilege escalation in the process. The polkit rule is rendered
+# from the same triggerable=true flag the broker config already uses — adding a
+# new triggerable service is one inventory change.
+#
+# Installed before the systemd unit (which is itself a notify) so that at the
+# flush below, Restart polkit runs before Restart ops-broker — the broker must
+# come up with the new polkit policy already live.
+- name: Install polkit rule authorising opsbroker to StartUnit triggerable services
+  ansible.builtin.template:
+    src: 50-ops-broker-manage-units.rules.j2
+    dest: /etc/polkit-1/rules.d/50-ops-broker-manage-units.rules
+    owner: root
+    group: root
+    mode: '0644'
+  when: ops_broker_services | dict2items | json_query('[?value.triggerable==`true`]') | length > 0
+  notify: Restart polkit
+
+# Flush here so polkitd picks up the new rule before the broker is restarted
+# by the systemd unit install below. Handler registration order is otherwise
+# "Restart ops-broker first, Restart polkit second" at end-of-play, leaving a
+# brief post-deploy window where start_service calls are denied by stale policy.
+- name: Flush handlers (reload polkit rule before broker restart)
+  ansible.builtin.meta: flush_handlers
+
 - name: Install ops-broker systemd unit
   ansible.builtin.template:
     src: ops-broker.service.j2
@@ -131,23 +164,6 @@
   notify:
     - Reload systemd
     - Restart ops-broker
-
-# Triggering a systemd oneshot from the broker requires the opsbroker user to be
-# allowed to call StartUnit on the specific unit. The broker's systemd unit runs
-# with NoNewPrivileges=true, so a setuid sudo path is unavailable: we authorise
-# the call via polkit, which gates D-Bus calls to systemd1 on a per-unit basis
-# without any privilege escalation in the process. The polkit rule is rendered
-# from the same triggerable=true flag the broker config already uses — adding a
-# new triggerable service is one inventory change.
-- name: Install polkit rule authorising opsbroker to StartUnit triggerable services
-  ansible.builtin.template:
-    src: 50-ops-broker-manage-units.rules.j2
-    dest: /etc/polkit-1/rules.d/50-ops-broker-manage-units.rules
-    owner: root
-    group: root
-    mode: '0644'
-  when: ops_broker_services | dict2items | json_query('[?value.triggerable==`true`]') | length > 0
-  notify: Restart polkit
 
 - name: Remove obsolete sudoers grant (superseded by polkit rule)
   ansible.builtin.file:
