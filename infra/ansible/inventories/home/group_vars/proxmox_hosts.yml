@@ -38,3 +38,9 @@ caddy_sites:
     upstream: 192.168.0.95:80
   - host: hermes.monotrope.au
     upstream: 192.168.0.96:9119
+  - host: pve.monotrope.au
+    upstream: 127.0.0.1:8006
+    insecure_skip_verify: true
+  - host: ha.monotrope.au
+    upstream: 192.168.0.86:8123
+    strip_forwarded: true

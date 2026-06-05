@@ -12,15 +12,18 @@
 
   @{{ matcher }} host {{ site.host }}
   handle @{{ matcher }} {
-{% if site.insecure_skip_verify | default(false) %}
     reverse_proxy {{ site.upstream }} {
+{% if site.insecure_skip_verify | default(false) %}
       transport http {
         tls_insecure_skip_verify
       }
-    }
-{% else %}
-    reverse_proxy {{ site.upstream }}
 {% endif %}
+{% if site.strip_forwarded | default(false) %}
+      header_up -X-Forwarded-For
+      header_up -X-Forwarded-Proto
+      header_up -X-Forwarded-Host
+{% endif %}
+    }
   }
 {% endfor %}
 
