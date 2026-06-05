@@ -74,7 +74,7 @@
     dest: "{{ libro_ingest_dir }}/.env"
     owner: root
     group: root
-    mode: '0600'
+    mode: '0644'
   no_log: true
   register: libro_ingest_env
 
