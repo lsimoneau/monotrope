@@ -10,7 +10,8 @@ RUN apt-get update \
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 RUN uv venv /opt/libro-venv \
  && uv pip install --python /opt/libro-venv/bin/python --no-cache librofm \
- && mkdir -p /var/lib/libro-ingest
+ && mkdir -p /var/lib/libro-ingest \
+ && chown 1028:1028 /var/lib/libro-ingest
 
 COPY libro-ingest /opt/libro-venv/bin/libro-ingest
 RUN chmod +x /opt/libro-venv/bin/libro-ingest

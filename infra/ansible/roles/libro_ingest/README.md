@@ -21,6 +21,45 @@ Format handling:
   re-downloading (librofm's skip-if-exists would otherwise leave
   partial files in place).
 
+## Status (as of 2026-06-06)
+
+**Working.** A full sweep authenticates, lists the library, downloads
+new M4Bs, and writes `state.json` cleanly
+(`downloaded=N already=0 errors=0`).
+
+Two notes for the next operator if the role breaks again:
+
+- **Required headers.** `librofm` (last release 2025-06) doesn't send
+  `User-Agent` or `X-LibroFm-AppVer`, and Libro.fm's load balancer
+  started rejecting every payload shape (including correct creds) at
+  the ELB in late 2025. We monkey-patch `LibroFMClient.headers` to
+  inject `User-Agent: okhttp/5.3.2` and `X-LibroFm-AppVer: 7.34.8`
+  (the values the official Android app uses; reference:
+  [`jedwards1230/libro-client`](https://github.com/jedwards1230/libro-client)
+  `APIHandler.ts`). If Libro.fm rotates the app version, update the
+  two `LIBROFM_*` defaults in `templates/env.j2` (or override at
+  deploy time via the env file / systemd Environment=).
+- **Auth-failure logging.** A non-JSON 4xx body is logged at WARNING
+  with status + first 500 chars (so a future API change at the ELB
+  shows up as a real diagnostic line, not a useless
+  `JSONDecodeError`). See `_do_post_logged` in `files/libro-ingest`.
+
+## Upgrading an existing install
+
+If you're upgrading a host that already has the role deployed, the
+state-tmp permission fix in the Dockerfile (`chown 1028:1028
+/var/lib/libro-ingest`) only takes effect on *new* image → new
+volume creation — the existing named volume keeps its old
+`root:root` ownership. Run this on the apps LXC once after pulling
+the new image:
+
+```bash
+chown -R 1028:1028 /var/lib/docker/volumes/libro-ingest_libro_state/_data
+```
+
+(`1028` is the `homelab` user — same UID the container runs as.)
+New installs don't need this; the Dockerfile already does it.
+
 ## First-time auth (once per install)
 
 `librofm` uses Libro.fm's OAuth password flow. The credentials are

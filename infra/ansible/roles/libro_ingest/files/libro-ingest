@@ -53,6 +53,30 @@ SLEEP_MIN = int(os.environ.get("SLEEP_MIN", "30"))
 SLEEP_MAX = int(os.environ.get("SLEEP_MAX", "90"))
 MAX_PER_RUN = int(os.environ["MAX_PER_RUN"]) if os.environ.get("MAX_PER_RUN") else None
 
+# Libro.fm added a User-Agent + X-LibroFm-AppVer requirement at the ELB in
+# late 2025; librofm (last released 2025-06) doesn't send either, so every
+# auth call returns 401 before reaching the auth backend. Override the
+# `headers` property on LibroFMClient to inject both. Env-var override so
+# we can rotate the app version when Libro.fm bumps it (see
+# jedwards1230/libro-client's APIHandler.ts for the reference values).
+LIBROFM_USER_AGENT = os.environ.get("LIBROFM_USER_AGENT", "okhttp/5.3.2")
+LIBROFM_APP_VER = os.environ.get("LIBROFM_APP_VER", "7.34.8")
+
+
+def _librofm_headers(self) -> dict[str, str]:
+    """Drop-in replacement for LibroFMClient.headers. Adds the two headers
+    Libro.fm's ELB now requires (`User-Agent`, `X-LibroFm-AppVer`) on top of
+    the default `Content-Type: application/json` and the post-auth
+    `Authorization: Bearer ...`."""
+    h = {
+        "Content-Type": "application/json",
+        "User-Agent": LIBROFM_USER_AGENT,
+        "X-LibroFm-AppVer": LIBROFM_APP_VER,
+    }
+    if self.access_token:
+        h["Authorization"] = f"Bearer {self.access_token}"
+    return h
+
 
 def _do_post_logged(self, endpoint, data):
     """Drop-in replacement for LibroFMClient._do_post that logs the raw
@@ -148,6 +172,11 @@ def main() -> int:
     load_env_file(ENV_FILE)
     username = os.environ["LIBROFM_USERNAME"]
     password = os.environ["LIBROFM_PASSWORD"]
+    # Inject the two headers Libro.fm's ELB now requires (`User-Agent` and
+    # `X-LibroFm-AppVer`). librofm's vendored `headers` property is missing
+    # both — the whole reason this wrapper exists. Overriding the property
+    # on the class means both _do_post and _do_get pick it up automatically.
+    _librofm_client.LibroFMClient.headers = property(_librofm_headers)
     # Patch vendored librofm before any call so its `_do_post` logs the raw
     # response. Survives `pip install --upgrade librofm` because the override
     # lives in our wrapper, not in site-packages.
