@@ -4,6 +4,47 @@ Plan for adding a `libro_ingest` role to the apps LXC, mirroring
 `audible_ingest` so Libro.fm purchases land under `/library/audiobooks`
 for Audiobookshelf to scan.
 
+## Status (as of 2026-06-06)
+
+**Working.** A full sweep authenticates, lists the library, downloads
+new M4Bs under `/audiobooks/<Author>/<Title>/`, and writes
+`state.json` cleanly (`downloaded=N already=0 errors=0`).
+
+Two real bugs were fixed before this; both are still the most likely
+failure modes if the role breaks again, so they're documented here:
+
+1. **`User-Agent` + `X-LibroFm-AppVer` required at the ELB.** `librofm`
+   (last release 2025-06-16) doesn't send either header, and Libro.fm
+   started rejecting every payload shape at the load balancer in late
+   2025 — *before* the request ever reaches the OAuth backend. The
+   `401` with an empty body that came back was the ELB's
+   "you're not a real app" response, not a credential problem. We
+   monkey-patch `LibroFMClient.headers` in
+   `infra/ansible/roles/libro_ingest/files/libro-ingest` to inject
+   `User-Agent: okhttp/5.3.2` and `X-LibroFm-AppVer: 7.34.8` (the
+   values reverse-engineered from the official Android client and
+   kept in sync with
+   [`jedwards1230/libro-client`](https://github.com/jedwards1230/libro-client)'s
+   `APIHandler.ts`). Both are env-var overridable
+   (`LIBROFM_USER_AGENT`, `LIBROFM_APP_VER`) so the operator can
+   rotate them without a code change when Libro.fm bumps the app
+   version. **Keep these in sync with the upstream reference if
+   Libro.fm rotates them.**
+
+2. **Raw-response logging on auth failure.** A prior fix
+   (`e44d8e6 fix(libro_ingest): log raw Libro.fm response on
+   auth/API failure`) wrapped `LibroFMClient._do_post` so a non-JSON
+   4xx body is logged at WARNING with the status code + first 500
+   chars, instead of a useless `JSONDecodeError`. This is what made
+   the empty-body 401 above visible in the first place.
+
+A secondary `state.tmp` permission error (the Dockerfile's `mkdir`
+ran as root but the container runs as UID 1028) is fixed at the same
+time by `chown 1028:1028 /var/lib/libro-ingest` in the Dockerfile —
+but that only takes effect on *new* image → new volume. Existing
+installs need a one-time host-side chown (see the role README's
+"Upgrading an existing install" section).
+
 ## Decisions (resolved)
 
 - **Acquisition source**: the `librofm` Python package (PyPI, released
