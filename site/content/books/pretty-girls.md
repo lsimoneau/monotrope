@@ -1,11 +1,11 @@
 ---
-title: Space Opera
-author: Catherynne Valente
-date: 2026-06-18
+title: Pretty Girls
+author: Karin Slaughter
+date: 2026-06-24
 status: finished
 publish: false
 build:
   render: never
   list: always
-rating: 4.5
+rating: 4.0
 ---
