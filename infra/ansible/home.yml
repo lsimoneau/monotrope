@@ -42,6 +42,8 @@
   force_handlers: true
   roles:
     - docker
+    - role: nfs_container_guard
+      tags: [nfs_container_guard]
     - calibre_web
     - audiobookshelf
     - role: audible_ingest

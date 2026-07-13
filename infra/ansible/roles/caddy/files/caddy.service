@@ -3,6 +3,13 @@ Description=Caddy
 Documentation=https://caddyserver.com/docs/
 After=network.target network-online.target tailscaled.service
 Requires=network-online.target
+# After= tailscaled only orders us after the daemon activates, not after it
+# has logged in and assigned the tailscale0 IP that Caddy binds to. On a cold
+# boot (e.g. after a power outage) Caddy can start first and die with
+# "bind: cannot assign requested address". These limits let it retry until the
+# IP appears rather than staying dead. ~24 tries over 2 min, then rate-limited.
+StartLimitIntervalSec=120
+StartLimitBurst=24
 
 [Service]
 Type=notify
@@ -11,6 +18,8 @@ Group=caddy
 EnvironmentFile=/etc/caddy/caddy.env
 ExecStart=/usr/local/bin/caddy run --environ --config /etc/caddy/Caddyfile
 ExecReload=/usr/local/bin/caddy reload --config /etc/caddy/Caddyfile --force
+Restart=on-failure
+RestartSec=5s
 TimeoutStopSec=5s
 LimitNOFILE=1048576
 PrivateTmp=true

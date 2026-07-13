@@ -1,0 +1,12 @@
+[Unit]
+Description=Reconcile Docker containers left exited by post-boot NFS unreadiness
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/nfs-container-guard.sh {{ nfs_guard_paths | join(' ') }}
+# If a probe does manage to get stuck on the mount, systemd cannot SIGKILL it
+# out of D-state — but it can stop waiting. Without a bound here, a stuck tick
+# holds the shutdown open for as long as the mount stays dead.
+TimeoutStopSec=30

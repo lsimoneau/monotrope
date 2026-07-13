@@ -1,0 +1,37 @@
+---
+# Guards Docker stacks that bind SUBDIRECTORIES of an NFS mount against the
+# post-boot race where the mount briefly denies the container-root uid and
+# Docker's create-time check fails without ever retrying. See the script header.
+
+- name: Install nfs-container-guard script
+  ansible.builtin.copy:
+    src: nfs-container-guard.sh
+    dest: /usr/local/sbin/nfs-container-guard.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install nfs-container-guard service
+  ansible.builtin.template:
+    src: nfs-container-guard.service.j2
+    dest: /etc/systemd/system/nfs-container-guard.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Install nfs-container-guard timer
+  ansible.builtin.copy:
+    src: nfs-container-guard.timer
+    dest: /etc/systemd/system/nfs-container-guard.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Enable and start nfs-container-guard timer
+  ansible.builtin.systemd:
+    name: nfs-container-guard.timer
+    enabled: true
+    state: started
+    daemon_reload: true

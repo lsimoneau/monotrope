@@ -1,0 +1,13 @@
+[Unit]
+Description=Periodically reconcile NFS-stuck Docker containers
+
+[Timer]
+# 15s after boot catches the outage case quickly (docker has already given up
+# by then); every 60s afterwards also recovers from a mid-life NAS reboot
+# without needing to reboot this host. Steady-state cost is negligible.
+OnBootSec=15s
+OnUnitActiveSec=60s
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

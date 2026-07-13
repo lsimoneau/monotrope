@@ -1,0 +1,8 @@
+---
+# Bind-source paths to probe before reconciling. These must match the NFS
+# subdirectories the Docker stacks bind-mount (calibre_web_library_path,
+# audiobookshelf_audiobooks_path, and the ingest sidecars). Kept as an explicit
+# list so the same role can guard another LXC by overriding it in the play.
+nfs_guard_paths:
+  - /library/books
+  - /library/audiobooks
