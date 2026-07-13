@@ -1,0 +1,71 @@
+# Managed by Ansible (role: immich). Adapted from the official Immich release
+# compose (docker/docker-compose.yml). Redis (Valkey) + Postgres stay on the
+# LXC's LOCAL rootfs; only UPLOAD_LOCATION (/data) is on the NAS via NFS.
+# Non-secret paths/version come from .env; secrets (DB_PASSWORD) live in .env
+# too (mode 0600), never in this file.
+name: immich
+
+services:
+  immich-server:
+    image: {{ immich_server_image }}
+    restart: unless-stopped
+    # The official Immich image ignores PUID/PGID (that's a linuxserver thing).
+    # Run the process itself as the NAS homelab uid/gid so originals on the
+    # root_squash NFS export aren't written as nobody — identity-mapped into
+    # this LXC by nas_idmap. Requires /library/photos owned 1028:1028 (README).
+    user: "{{ immich_puid }}:{{ immich_pgid }}"
+    env_file:
+      - .env
+{% if not immich_ml_enabled %}
+    environment:
+      IMMICH_MACHINE_LEARNING_ENABLED: "false"
+{% endif %}
+    volumes:
+      - ${UPLOAD_LOCATION}:/data
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "{{ immich_port }}:2283"
+    depends_on:
+      - redis
+      - database
+    healthcheck:
+      disable: false
+{% if immich_ml_enabled %}
+
+  immich-machine-learning:
+    image: {{ immich_ml_image }}
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - model-cache:/cache
+    healthcheck:
+      disable: false
+{% endif %}
+
+  redis:
+    image: {{ immich_redis_image }}
+    restart: unless-stopped
+    healthcheck:
+      test: redis-cli ping || exit 1
+
+  database:
+    image: {{ immich_postgres_image }}
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_DB: ${DB_DATABASE_NAME}
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+    volumes:
+      - ${DB_DATA_LOCATION}:/var/lib/postgresql/data
+    shm_size: 128mb
+    healthcheck:
+      test: >-
+        pg_isready --dbname="$${POSTGRES_DB}" --username="$${POSTGRES_USER}" || exit 1
+      interval: 5m
+      start_interval: 30s
+      start_period: 5m
+
+volumes:
+  model-cache:

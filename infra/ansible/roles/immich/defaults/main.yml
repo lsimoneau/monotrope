@@ -1,0 +1,41 @@
+---
+immich_dir: /opt/immich
+immich_version: release          # rolling stable; pin to e.g. v3.0.0 to freeze
+immich_port: 2283
+immich_base_url: https://photos.monotrope.au
+immich_tz: Australia/Sydney
+
+# Originals + generated thumbs/encoded video live on the NAS (NFS), mounted
+# into this LXC at /library (Proxmox mp0). The Postgres data dir MUST be local
+# — Immich does not support the database on a network share — so it stays on
+# the LXC rootfs.
+immich_upload_location: /library/photos
+immich_db_data_location: /opt/immich/postgres
+
+# Immich's containers run as root by default; on our root_squash NFS export
+# that lands originals as `nobody`. The official image ignores PUID/PGID, so we
+# run immich-server via the compose `user:` directive as the NAS `homelab`
+# uid/gid (1028, identity-mapped into this LXC by the nas_idmap feature) so
+# writes to /library/photos are owned correctly. Same 1028 target calibre uses.
+immich_puid: 1028
+immich_pgid: 1028
+
+# Machine learning (face detection + CLIP smart search) runs in its own
+# container and is the main RAM consumer. Left enabled, but set the Smart
+# Search / Face Detection job concurrency to 1 in the admin UI during the
+# first library backfill (see README) so it doesn't push the node into swap.
+immich_ml_enabled: true
+
+# Pinned upstream images (digests from the official release compose —
+# docker/docker-compose.yml). Bump server + ml together; refresh the redis /
+# postgres digests only when upstream does.
+immich_server_image: "ghcr.io/immich-app/immich-server:{{ immich_version }}"
+immich_ml_image: "ghcr.io/immich-app/immich-machine-learning:{{ immich_version }}"
+immich_redis_image: "docker.io/valkey/valkey:9@sha256:4963247afc4cd33c7d3b2d2816b9f7f8eeebab148d29056c2ca4d7cbc966f2d9"
+immich_postgres_image: "ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23"
+
+immich_db_username: immich
+immich_db_database_name: immich
+# immich_db_password is resolved from the vault via group_vars/all/vars.yml
+# (vault_immich_db_password). Use an ALPHANUMERIC-ONLY value — Immich rejects
+# special characters in the DB password.

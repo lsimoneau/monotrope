@@ -34,6 +34,8 @@ caddy_sites:
     upstream: 192.168.0.97:8080
   - host: bookmarks.monotrope.au
     upstream: 192.168.0.97:3002
+  - host: photos.monotrope.au
+    upstream: 192.168.0.90:2283
   - host: pihole.monotrope.au
     upstream: 192.168.0.95:80
   - host: hermes.monotrope.au

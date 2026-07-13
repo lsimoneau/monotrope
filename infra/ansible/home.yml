@@ -70,3 +70,16 @@
   roles:
     - docker
     - pihole
+
+- name: Provision immich LXC
+  hosts: immich
+  become: true
+  force_handlers: true
+  roles:
+    - docker
+    - immich
+    - role: nfs_container_guard
+      tags: [nfs_container_guard]
+      vars:
+        nfs_guard_paths:
+          - /library/photos

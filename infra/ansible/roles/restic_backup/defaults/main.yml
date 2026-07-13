@@ -36,6 +36,8 @@ restic_backup_lxcs:
     hostname: jellyfin
   - vmid: 105
     hostname: pihole
+  - vmid: 106
+    hostname: immich
 
 # Backup sets: each defines paths (relative to the LXC mount point) and
 # optional pre/post commands. Paths are prefixed with the LXC mount at
@@ -51,6 +53,18 @@ restic_backup_sets:
     host_paths:
       - "{{ restic_dump_dir }}/miniflux_dump.pgdump"
     tags: [miniflux, critical, apps]
+
+  # Immich DB only. Photo originals live on the NAS (NFS /library/photos), are
+  # not on the LXC rootfs, and rely on the NAS's own backup — not restic.
+  # pg_dumpall per Immich's backup guidance (roles/extensions/VectorChord).
+  - name: immich-db
+    vmid: 106
+    pre_commands:
+      - "pct exec 106 -- docker exec immich-database-1 pg_dumpall --clean --if-exists --username=immich > {{ restic_dump_dir }}/immich_dump.sql"
+    paths: []            # dump-only; the live Postgres data dir is not backed up
+    host_paths:
+      - "{{ restic_dump_dir }}/immich_dump.sql"
+    tags: [immich, critical]
 
   - name: hermes-state
     vmid: 104

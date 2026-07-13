@@ -1,0 +1,72 @@
+---
+# Bring up Immich (self-hosted photo library: phone auto-backup, timeline,
+# albums, optional ML face/semantic search). Originals live on the NAS at
+# {{ immich_upload_location }} (NFS via the /library mp0 bind); Postgres +
+# Redis + the ML model cache stay on the LXC's local rootfs.
+#
+# Mirrors the karakeep role's compose lifecycle. The photo library directory
+# must already exist on the NAS owned by the homelab user (1028) — the
+# container can't create it because container-root squashes to nobody on the
+# root_squash export. See README.md for the one-time NAS-side + pct-create
+# provisioning steps.
+
+- name: Assert the NFS photo library exists and is writable
+  # /library/photos must be pre-created NAS-side owned by 1028:1028. If it's
+  # missing, fail loudly here rather than letting Immich land originals as
+  # nobody or the nfs-container-guard mkdir probe fail cryptically.
+  ansible.builtin.stat:
+    path: "{{ immich_upload_location }}"
+  register: immich_upload_stat
+  failed_when: not immich_upload_stat.stat.exists or not immich_upload_stat.stat.isdir
+
+- name: Ensure immich directory
+  ansible.builtin.file:
+    path: "{{ immich_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Ensure local Postgres data directory
+  ansible.builtin.file:
+    path: "{{ immich_db_data_location }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Render compose.yml
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ immich_dir }}/compose.yml"
+    owner: root
+    group: root
+    mode: '0644'
+  register: immich_compose
+
+- name: Render .env
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ immich_dir }}/.env"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+  register: immich_env
+
+- name: Bring up immich
+  ansible.builtin.command:
+    cmd: docker compose up -d --pull always --remove-orphans
+    chdir: "{{ immich_dir }}"
+  register: immich_up
+  changed_when: >-
+    'Started' in immich_up.stderr
+    or 'Created' in immich_up.stderr
+    or 'Recreate' in immich_up.stderr
+
+- name: Restart immich if compose or env changed
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate
+    chdir: "{{ immich_dir }}"
+  when: immich_compose.changed or immich_env.changed
+  changed_when: true
