@@ -108,6 +108,30 @@
   changed_when: true
   register: lxc_ns_cleared
 
+# `onboot` decides whether pve-guests starts an LXC at boot. Declared in
+# inventory (`lxc_onboot`, default true) rather than left to whatever `pct` was
+# last told by hand — an LXC silently missing from a post-reboot host is not a
+# failure anything reports.
+- name: Ensure LXC onboot flag matches inventory
+  ansible.builtin.command:
+    cmd: "pct set {{ item.vmid }} --onboot {{ desired_onboot }}"
+  loop: "{{ proxmox_lxc_apply }}"
+  loop_control:
+    label: "vmid={{ item.vmid }} onboot={{ desired_onboot }}"
+  vars:
+    desired_onboot: "{{ 1 if (item.lxc_onboot | default(true)) else 0 }}"
+    current_onboot: >-
+      {{
+        (lxc_confs_raw.results
+         | selectattr('item.vmid', 'equalto', item.vmid)
+         | map(attribute='content') | first | b64decode).splitlines()
+        | select('match', '^onboot:')
+        | map('regex_replace', '^onboot:\\s*', '')
+        | first | default('0')
+      }}
+  when: current_onboot != desired_onboot
+  changed_when: true
+
 - name: Ensure subuid entries for passthrough UIDs
   ansible.builtin.lineinfile:
     path: /etc/subuid

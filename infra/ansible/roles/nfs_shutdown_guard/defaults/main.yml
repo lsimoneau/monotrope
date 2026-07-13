@@ -1,0 +1,28 @@
+---
+# Liveness probe against each mounted NFS server, at shutdown. 2049 is nfsd.
+# Kept short: this runs on the shutdown path, and a server that needs more than
+# a few seconds to answer a TCP connect is not one the guests can be gracefully
+# stopped against anyway.
+nfs_shutdown_guard_probe_port: 2049
+nfs_shutdown_guard_probe_timeout: 3
+nfs_shutdown_guard_probe_tries: 2
+
+# How long a container gets to stop gracefully before it is killed, once its
+# NFS server has been confirmed dead. Short by design: the guard force-unmounts
+# the dead mount BEFORE stopping anything, so a container that can still stop
+# will do so promptly (its I/O now fails fast instead of hanging), and one that
+# can't was never going to — on 2026-07-13 CT 103 burned a full 180s of grace
+# and still had to be killed. Waiting longer only lengthens the shutdown.
+nfs_shutdown_guard_stop_grace: 10
+
+# Hard ceiling on the whole rescue; systemd SIGKILLs it at this point, which
+# would leave the deadlock half-cleared. Must exceed the worst case:
+# (affected containers) × (stop_grace + kill 15s + SIGKILL 10s), which for the
+# four NFS-bound CTs here is ~140s, plus probes and the namespace sweeps.
+nfs_shutdown_guard_timeout: 300
+
+# Backstop for anything the rescue fails to cover: the point at which systemd
+# gives up waiting for pve-guests to stop and proceeds to power off regardless.
+# Generous, because a healthy shutdown of a full guest set legitimately takes
+# minutes — this is a deadlock breaker, not a performance target.
+pve_guests_timeout_stop_sec: 600

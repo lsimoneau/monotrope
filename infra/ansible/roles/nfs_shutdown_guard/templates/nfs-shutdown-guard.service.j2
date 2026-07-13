@@ -1,0 +1,26 @@
+[Unit]
+Description=Rescue the shutdown if an NFS server is unreachable
+# Shutdown order is the reverse of start order, so ordering ourselves After=
+# pve-guests means our ExecStop runs BEFORE pve-guests starts stopping guests.
+# That is the only window in which a dead-NFS deadlock can still be broken:
+# once pve-guests is blocked on an uninterruptible umount, nothing can preempt
+# it. No Wants=/Requires= — pve-guests is RefuseManualStart, we only order
+# against it.
+After=pve-guests.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# The unit exists purely so that it can be *stopped* at shutdown; there is no
+# work to do at boot.
+ExecStart=/bin/true
+ExecStop=/usr/local/sbin/nfs-shutdown-guard.sh
+Environment=NFS_GUARD_PROBE_PORT={{ nfs_shutdown_guard_probe_port }}
+Environment=NFS_GUARD_PROBE_TIMEOUT={{ nfs_shutdown_guard_probe_timeout }}
+Environment=NFS_GUARD_PROBE_TRIES={{ nfs_shutdown_guard_probe_tries }}
+Environment=NFS_GUARD_STOP_GRACE={{ nfs_shutdown_guard_stop_grace }}
+# A rescue that hangs is worse than no rescue: bound it hard.
+TimeoutStopSec={{ nfs_shutdown_guard_timeout }}
+
+[Install]
+WantedBy=multi-user.target

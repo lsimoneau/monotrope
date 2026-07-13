@@ -1,0 +1,15 @@
+# Managed by Ansible (role: nfs_shutdown_guard). Do not edit by hand.
+#
+# PVE ships pve-guests.service with TimeoutSec=infinity, which sets BOTH the
+# start and the stop timeout. The stop half is a foot-gun: if a single guest
+# cannot be stopped — a container wedged on a dead NFS mount, say — systemd
+# waits for it literally forever and the host never reaches poweroff.
+#
+# The nfs_shutdown_guard ExecStop should mean we never get here. This is the
+# backstop for the case it does not cover: bound the stop side so the host is
+# always able to power itself off unaided.
+#
+# The start side stays unbounded on purpose — guests are started serially with
+# deliberate startup delays between them, and a slow boot is not a fault.
+[Service]
+TimeoutStopSec={{ pve_guests_timeout_stop_sec }}

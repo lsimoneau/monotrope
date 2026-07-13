@@ -1,0 +1,49 @@
+---
+# Makes the Proxmox host able to power itself off when the NAS is already gone.
+# Without this, a `hard` NFS mount to a dead server blocks the guest-stop path
+# in uninterruptible D-state and, with pve-guests' TimeoutSec=infinity, the
+# shutdown never completes. See the script header for the full mechanism.
+
+- name: Install nfs-shutdown-guard script
+  ansible.builtin.copy:
+    src: nfs-shutdown-guard.sh
+    dest: /usr/local/sbin/nfs-shutdown-guard.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install nfs-shutdown-guard service
+  ansible.builtin.template:
+    src: nfs-shutdown-guard.service.j2
+    dest: /etc/systemd/system/nfs-shutdown-guard.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Ensure pve-guests drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/system/pve-guests.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Bound pve-guests stop timeout (PVE ships TimeoutSec=infinity)
+  ansible.builtin.template:
+    src: pve-guests-timeout.conf.j2
+    dest: /etc/systemd/system/pve-guests.service.d/timeout.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+# Enabled and started so that it is *active* and therefore gets stopped — and
+# so its ExecStop runs — during the shutdown transaction. Starting it is a
+# no-op (ExecStart=/bin/true); all the work is on the stop side.
+- name: Enable and start nfs-shutdown-guard
+  ansible.builtin.systemd:
+    name: nfs-shutdown-guard.service
+    enabled: true
+    state: started
+    daemon_reload: true
