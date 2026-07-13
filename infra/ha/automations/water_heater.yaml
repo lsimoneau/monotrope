@@ -1,0 +1,170 @@
+# Heat-pump hot water control.
+#
+# Replaces the Emerald app's 10:00-19:00 timer, run from Home Assistant so we
+# can layer a cold-tank failsafe and a summer solar-boost on top of it. Once
+# this is live, TURN OFF the timer in the Emerald app or the two will fight.
+#
+# Control surface (the emerald integration's water_heater entity exposes
+# operation modes only - there is no settable target temperature, and the
+# underlying protocol has no temperature command at all). So:
+#   heat_pump    -> "normal" mode, unit targets 60 C
+#   performance  -> "boost" mode,  unit targets 65 C
+#   off          -> switch off
+# We enforce our own cut-offs (e.g. the 40 C failsafe ceiling) by toggling the
+# unit on/off while watching the tank temperature - the mode just sets the
+# ceiling the unit would reach if we left it running.
+#
+# The tank temp sensor reads the *coldest* part of the tank, so the same number
+# means different things: 25 C on the way down from 60 still has usable hot
+# water stratified above it; 25 C that never got hot is a cold tank. That's why
+# the failsafe trips at 20 C (unambiguously cold) and why the daytime timer is
+# the real guarantee - it is pure time-based and reaches 60 C daily regardless.
+#
+# Entities:
+#   water_heater.heat_pump_hot_water                on/off + mode
+#   sensor.heat_pump_hot_water_current_temperature  tank temp, C (coldest point)
+#   sensor.solarnet_power_photovoltaics             solar production, W
+#   sensor.electricity_advisor_power                grid import, W (+ve = import)
+#                                                   NB: confirm sign before
+#                                                   trusting the boost rule.
+
+- id: hws_daytime_timer
+  alias: "HWS: daytime timer (10:00-19:00 @ 60C)"
+  description: >-
+    The workhorse. Heats to 60 C every day across the solar window, exactly like
+    the old Emerald timer. Pure time-based, so it keeps running even if a sensor
+    goes unavailable - this is the baseline that keeps mornings reliable.
+  mode: single
+  triggers:
+    - trigger: time
+      at: "10:00:00"
+      id: "on"
+    - trigger: time
+      at: "19:00:00"
+      id: "off"
+  actions:
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: "on"
+          sequence:
+            - action: water_heater.set_operation_mode
+              target:
+                entity_id: water_heater.heat_pump_hot_water
+              data:
+                operation_mode: heat_pump
+        - conditions:
+            - condition: trigger
+              id: "off"
+          sequence:
+            - action: water_heater.set_operation_mode
+              target:
+                entity_id: water_heater.heat_pump_hot_water
+              data:
+                operation_mode: "off"
+
+- id: hws_cold_failsafe_on
+  alias: "HWS: failsafe on (<20C outside timer)"
+  description: >-
+    Below 20 C the tank is genuinely cold, not just drawn down from hot. If that
+    happens while the daytime timer isn't running, turn on (normal/60). The
+    matching '_off' rule stops it at 40 C. Scoped to outside 10:00-19:00 because
+    inside the window the timer is already heating to 60.
+  mode: single
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.heat_pump_hot_water_current_temperature
+      below: 20
+  conditions:
+    - condition: time
+      after: "19:00:00"
+      before: "10:00:00"
+    - condition: state
+      entity_id: water_heater.heat_pump_hot_water
+      state: "off"
+  actions:
+    - action: water_heater.set_operation_mode
+      target:
+        entity_id: water_heater.heat_pump_hot_water
+      data:
+        operation_mode: heat_pump
+
+- id: hws_cold_failsafe_off
+  alias: "HWS: failsafe off (reaches 40C outside timer)"
+  description: >-
+    Stops the failsafe once the tank reaches 40 C - enough for a morning shower
+    without running all night. The time condition keeps it from cutting the
+    daytime timer short (which targets 60 C); inside the window it never fires.
+  mode: single
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.heat_pump_hot_water_current_temperature
+      above: 40
+      for: "00:02:00"
+  conditions:
+    - condition: time
+      after: "19:00:00"
+      before: "10:00:00"
+    - condition: state
+      entity_id: water_heater.heat_pump_hot_water
+      state: heat_pump
+  actions:
+    - action: water_heater.set_operation_mode
+      target:
+        entity_id: water_heater.heat_pump_hot_water
+      data:
+        operation_mode: "off"
+
+- id: hws_summer_boost_on
+  alias: "HWS: boost to 65C on surplus solar"
+  description: >-
+    During the daytime window, if we're importing ~nothing while solar is strong,
+    there's spare PV - switch to boost (65 C) to bank extra heat. With no export
+    meter we can only see import near zero, so this is try-and-back-off: the
+    '_off' rule reverts to 60 C if boosting starts pulling grid. The solar floor
+    keeps it effectively summer-only.
+  mode: single
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.electricity_advisor_power
+      below: 50
+      for: "00:05:00"
+  conditions:
+    - condition: time
+      after: "10:00:00"
+      before: "19:00:00"
+    - condition: numeric_state
+      entity_id: sensor.solarnet_power_photovoltaics
+      above: 2000
+    - condition: state
+      entity_id: water_heater.heat_pump_hot_water
+      state: heat_pump
+  actions:
+    - action: water_heater.set_operation_mode
+      target:
+        entity_id: water_heater.heat_pump_hot_water
+      data:
+        operation_mode: performance
+
+- id: hws_summer_boost_off
+  alias: "HWS: revert boost to 60C when importing"
+  description: >-
+    Drops back from boost (65 C) to normal (60 C) when grid import climbs - i.e.
+    the surplus wasn't really there. Hysteresis (revert >200 W vs engage <50 W,
+    both held 5 min) stops it flapping.
+  mode: single
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.electricity_advisor_power
+      above: 200
+      for: "00:05:00"
+  conditions:
+    - condition: state
+      entity_id: water_heater.heat_pump_hot_water
+      state: performance
+  actions:
+    - action: water_heater.set_operation_mode
+      target:
+        entity_id: water_heater.heat_pump_hot_water
+      data:
+        operation_mode: heat_pump

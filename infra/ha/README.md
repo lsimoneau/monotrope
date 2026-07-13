@@ -25,6 +25,25 @@ HA_TOKEN=… uv run infra/ha/sync_dashboards.py --dump home > infra/ha/dashboard
 
 (Dump mode TBD — for now use `lovelace/config` over the websocket API.)
 
+## Automations
+
+`automations/<file>.yaml` is a list of automation configs (each with a stable
+`id`). Push with:
+
+```sh
+HA_TOKEN=… uv run infra/ha/sync_automations.py                # push all
+HA_TOKEN=… uv run infra/ha/sync_automations.py water_heater   # push one file
+```
+
+The script POSTs each automation to `/api/config/automation/config/<id>` (which
+writes HA's managed `automations.yaml` and reloads), so it works on HAOS without
+filesystem access. It's one-way (repo → HA): if you edit an automation in the UI,
+copy it back into the YAML or the next push will clobber it.
+
+- `water_heater.yaml` — heat-pump hot water: daytime solar-window timer, a
+  cold-tank failsafe, and a summer surplus-solar boost. Retire the Emerald app's
+  own timer once this is live, or they'll fight.
+
 ## Areas, devices, entities
 
 These live in HAOS's own registry storage and are not source-controlled.
