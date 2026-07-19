@@ -26,6 +26,7 @@ caddy_sites:
     upstream: 192.168.0.98:9696
   - host: calibre.monotrope.au
     upstream: 192.168.0.97:8083
+    http_cover_proxy: true   # serve Kobo cover thumbnails over HTTP (see Caddyfile.j2)
   - host: abs.monotrope.au
     upstream: 192.168.0.97:13378
   - host: koinsight.monotrope.au

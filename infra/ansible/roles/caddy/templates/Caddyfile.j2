@@ -1,9 +1,10 @@
+{% set caddy_binds = (caddy_bind_address if caddy_bind_address is sequence and caddy_bind_address is not string else [caddy_bind_address]) | join(' ') %}
 {
   email {{ caddy_email }}
 }
 
 {{ caddy_wildcard_host }} {
-  bind {{ (caddy_bind_address if caddy_bind_address is sequence and caddy_bind_address is not string else [caddy_bind_address]) | join(' ') }}
+  bind {{ caddy_binds }}
   tls {
     dns cloudflare {env.CLOUDFLARE_API_TOKEN}
   }
@@ -31,3 +32,22 @@
     respond "no service mapped for {host}" 404
   }
 }
+{% for site in caddy_sites %}
+{% if site.http_cover_proxy | default(false) %}
+
+# Kobo e-readers downgrade the HTTPS cover-image host we hand them to HTTP
+# (calibre-web #1758) and won't follow the auto HTTPS redirect, so library
+# thumbnails silently fail. Serve *only* the Kobo cover path over HTTP; every
+# other HTTP request for this host still redirects to HTTPS.
+http://{{ site.host }} {
+  bind {{ caddy_binds }}
+  @kobocover path_regexp ^/kobo/.+\.(jpg|jpeg)$
+  handle @kobocover {
+    reverse_proxy {{ site.upstream }}
+  }
+  handle {
+    redir https://{host}{uri} permanent
+  }
+}
+{% endif %}
+{% endfor %}

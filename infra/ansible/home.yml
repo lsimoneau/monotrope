@@ -12,7 +12,7 @@
   roles:
     - proxmox_host
     - { role: proxmox_lxc_config, tags: [lxc_config] }
-    - caddy
+    - { role: caddy, tags: [caddy] }
     - restic_backup
     - { role: nfs_shutdown_guard, tags: [nfs_shutdown_guard] }
     - { role: ops_broker, tags: [ops_broker] }
